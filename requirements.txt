@@ -1,0 +1,28 @@
+# Web framework & ASGI server
+fastapi==0.115.12
+uvicorn[standard]==0.34.3
+
+# HTTP client (async, with retry support)
+httpx==0.28.1
+
+# Data processing
+pandas==2.2.3
+
+# LLM — Anthropic SDK for Claude; OpenAI SDK for GitHub Models (OpenAI-compatible)
+anthropic==0.52.0
+openai==1.82.0
+
+# Frontend
+streamlit==1.45.1
+plotly==6.1.1
+streamlit-searchbox==0.1.12
+
+# Env var management
+python-dotenv==1.1.0
+
+# Data validation (FastAPI depends on this; pinning for clarity)
+pydantic==2.11.4
+
+# Testing
+pytest==8.3.5
+pytest-asyncio==0.26.0

@@ -1,0 +1,27 @@
+# Environment variables — contains secrets, never commit
+.env
+
+# Python bytecode cache
+__pycache__/
+*.pyc
+*.pyo
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# macOS metadata
+.DS_Store
+
+# IDE settings
+.vscode/
+.idea/
+
+# Pytest cache
+.pytest_cache/
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
