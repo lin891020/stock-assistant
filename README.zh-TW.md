@@ -1,3 +1,5 @@
+[English](README.md) | [繁體中文](README.zh-TW.md)
+
 # 台股關注度分析 Assistant
 
 輸入股票代號，系統從 TWSE OpenAPI 抓取最近 60 筆交易日資料，

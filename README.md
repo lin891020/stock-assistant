@@ -1,3 +1,5 @@
+[English](README.md) | [繁體中文](README.zh-TW.md)
+
 # Stock Assistant
 
 A Taiwan stock market attention analysis tool. Input a stock ticker and the system fetches the latest 60 trading days of data from TWSE, calculates five technical indicators, produces a quantitative score (0–100), and generates a structured explanation via Claude AI.
