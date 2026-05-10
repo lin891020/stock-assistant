@@ -245,8 +245,6 @@ def main() -> None:
     )
     st.caption(f"資料區間：{result.start_date} ～ {result.end_date}（共 {len(df)} 個交易日）")
 
-    st.divider()
-
     # --- Charts ---
     st.plotly_chart(
         _build_price_chart(result.dates, result.closes, result.ma5_series, result.ma20_series),
@@ -259,12 +257,7 @@ def main() -> None:
 
     st.divider()
 
-    # --- Score bars ---
-    _render_score_bars(result.scores, result.total_score)
-
-    st.divider()
-
-    # --- LLM analysis ---
+    # --- LLM analysis (streaming) ---
     st.subheader("AI 分析說明")
     st.caption(f"以下說明由 {_MODEL_LABEL} 根據上方量化指標生成，僅供參考，非投資建議。")
 
@@ -278,20 +271,29 @@ def main() -> None:
 
     try:
         llm = LLMOutput(**json.loads(raw_output))
-        st.markdown(llm.summary)
-
-        with st.expander("展開關鍵訊號與風險提示"):
-            col_sig, col_risk = st.columns(2)
-            with col_sig:
-                st.markdown("**關鍵訊號**")
-                for sig in llm.key_signals:
-                    st.markdown(f"- {sig}")
-            with col_risk:
-                st.markdown("**風險提示**")
-                for risk in llm.risks:
-                    st.markdown(f"- {risk}")
     except Exception:
         st.markdown(raw_output)
+        return
+
+    verdict_color = "green" if llm.verdict == "值得關注" else "red"
+    tab_retail, tab_inst = st.tabs(["散戶模式", "法人模式"])
+
+    with tab_retail:
+        st.markdown(f":{verdict_color}[**{llm.verdict}**]　信心：**{llm.confidence}**")
+        st.markdown(llm.summary)
+        st.markdown("**⚠️ 風險提示**")
+        st.markdown("\n".join(f"- {r}" for r in llm.risks))
+
+    with tab_inst:
+        st.markdown(f":{verdict_color}[**{llm.verdict}**]　信心：**{llm.confidence}**")
+        st.divider()
+        _render_score_bars(result.scores, result.total_score)
+        st.divider()
+        st.markdown("**關鍵訊號**")
+        st.markdown("\n".join(f"- {s}" for s in llm.key_signals))
+        st.markdown("**⚠️ 風險提示**")
+        st.markdown("\n".join(f"- {r}" for r in llm.risks))
+
 
 
 if __name__ == "__main__":
