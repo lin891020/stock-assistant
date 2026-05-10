@@ -60,12 +60,12 @@ def _get_provider() -> str:
 # System prompt — shared across both providers
 # ---------------------------------------------------------------------------
 
-_SYSTEM_PROMPT = """你是一位台股技術分析助理。你的工作是根據使用者提供的量化指標，
+_SYSTEM_PROMPT = """你是一位台股技術分析助理。你的工作是根據使用者提供的量化指標與近期新聞，
 用繁體中文撰寫清楚、有依據的分析說明。
 
 【限制】
-- 只能根據給定的量化指標進行說明，不能加入任何自己的主觀判斷或外部資訊
-- 不能給予明確的買賣建議，僅說明技術面訊號
+- 只能根據給定的量化指標和提供的新聞標題進行說明，不能加入任何其他外部資訊
+- 不能給予明確的買賣建議，僅說明技術面與新聞面訊號
 - 不能引用任何不在輸入資料中的數字
 
 【輸出格式】
@@ -94,11 +94,12 @@ _SYSTEM_PROMPT = """你是一位台股技術分析助理。你的工作是根據
 # Prompt builder
 # ---------------------------------------------------------------------------
 
-def _build_user_prompt(result: AnalysisResult) -> str:
+def _build_user_prompt(result: AnalysisResult, news_items: list[dict] | None = None) -> str:
     """將 AnalysisResult 轉換為結構化的 user prompt 文字。
 
     Args:
         result: analyzer.analyze() 回傳的分析結果
+        news_items: 近期新聞列表（可選），來自 news_fetcher.fetch_recent_news()
 
     Returns:
         結構化的 prompt 字串
@@ -121,9 +122,14 @@ def _build_user_prompt(result: AnalysisResult) -> str:
         f"   - RSI = {s.rsi}（健康區間 45–65）",
         f"5. 價格穩定性（10分）：得分 {s.stability_score}",
         f"   - 變異係數 = {s.stability_cv:.4f}（門檻 < 0.05）",
-        "",
-        "請依照系統 prompt 指定的 JSON 格式輸出分析結果。",
     ]
+
+    if news_items:
+        lines += ["", "【近期相關新聞】（僅供參考，請結合技術指標綜合說明）"]
+        for i, news in enumerate(news_items, 1):
+            lines.append(f"{i}. {news['title']}（{news['source']}，{news['published']}）")
+
+    lines += ["", "請依照系統 prompt 指定的 JSON 格式輸出分析結果。"]
     return "\n".join(lines)
 
 
@@ -255,21 +261,18 @@ def _stream_github(user_prompt: str) -> Generator[str, None, None]:
 # Public API
 # ---------------------------------------------------------------------------
 
-def generate_analysis(result: AnalysisResult) -> LLMOutput:
+def generate_analysis(result: AnalysisResult, news_items: list[dict] | None = None) -> LLMOutput:
     """呼叫 LLM，回傳結構化分析結果（非串流版本，供 FastAPI 使用）。
-
-    依 LLM_PROVIDER 環境變數選擇 provider：
-      - "anthropic"（預設）：Claude Haiku，需要 ANTHROPIC_API_KEY
-      - "github"：GitHub Models gpt-4o-mini，需要 GITHUB_TOKEN
 
     Args:
         result: analyzer.analyze() 回傳的分析結果
+        news_items: 近期新聞列表（可選）
 
     Returns:
         LLMOutput，解析失敗時回傳 fallback。
     """
     provider = _get_provider()
-    user_prompt = _build_user_prompt(result)
+    user_prompt = _build_user_prompt(result, news_items)
 
     logger.info("Generating analysis via provider: %s", provider)
 
@@ -281,19 +284,18 @@ def generate_analysis(result: AnalysisResult) -> LLMOutput:
     return _parse_llm_output(raw_text, result)
 
 
-def stream_analysis(result: AnalysisResult) -> Generator[str, None, None]:
+def stream_analysis(result: AnalysisResult, news_items: list[dict] | None = None) -> Generator[str, None, None]:
     """呼叫 LLM 並以串流方式 yield 文字片段（供 Streamlit 使用）。
-
-    依 LLM_PROVIDER 環境變數選擇 provider，streaming 介面對兩個 provider 一致。
 
     Args:
         result: analyzer.analyze() 回傳的分析結果
+        news_items: 近期新聞列表（可選）
 
     Yields:
         LLM 回傳的文字片段（str）
     """
     provider = _get_provider()
-    user_prompt = _build_user_prompt(result)
+    user_prompt = _build_user_prompt(result, news_items)
 
     logger.info("Streaming analysis via provider: %s", provider)
 

@@ -24,6 +24,7 @@ from streamlit_searchbox import st_searchbox
 from app import analyzer
 from app.llm import stream_analysis
 from app.models import LLMOutput
+from app.news_fetcher import fetch_recent_news
 from app.twse_client import (
     InsufficientDataError,
     StockNotFoundError,
@@ -81,18 +82,19 @@ def _search_stocks(query: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 async def _fetch_data_and_name(stock_no: str):
-    """並發抓取股票資料與名稱，名稱失敗時靜默回傳空字串。"""
+    """並發抓取股票資料、名稱與新聞，失敗時靜默降級。"""
     async def safe_fetch_name(sno: str) -> str:
         try:
             return await fetch_stock_name(sno)
         except Exception:
             return ""
 
-    df, name = await asyncio.gather(
+    df, name, news = await asyncio.gather(
         fetch_stock_data(stock_no),
         safe_fetch_name(stock_no),
+        fetch_recent_news(stock_no),
     )
-    return df, name
+    return df, name, news
 
 
 # ---------------------------------------------------------------------------
@@ -222,7 +224,7 @@ def main() -> None:
     # --- Fetch & analyze ---
     with st.spinner("正在從 TWSE 抓取資料..."):
         try:
-            df, stock_name = asyncio.run(_fetch_data_and_name(stock_no))
+            df, stock_name, news_items = asyncio.run(_fetch_data_and_name(stock_no))
         except StockNotFoundError:
             st.error(f"查無股票代號「{stock_no}」，請確認代號是否正確（目前僅支援上市股票）。")
             return
@@ -263,7 +265,7 @@ def main() -> None:
 
     stream_placeholder = st.empty()
     chunks: list[str] = []
-    for chunk in stream_analysis(result):
+    for chunk in stream_analysis(result, news_items or None):
         chunks.append(chunk)
         stream_placeholder.markdown("".join(chunks) + "▌")
     raw_output = "".join(chunks)
@@ -283,6 +285,18 @@ def main() -> None:
         st.markdown(llm.summary)
         st.markdown("**⚠️ 風險提示**")
         st.markdown("\n".join(f"- {r}" for r in llm.risks))
+        if news_items:
+            with st.expander("📰 參考新聞來源"):
+                for news in news_items:
+                    url = news.get("url", "")
+                    title = news["title"]
+                    source = news.get("source", "")
+                    published = news.get("published", "")
+                    label = f"{title}　{source}　{published}"
+                    if url:
+                        st.markdown(f"- [{label}]({url})")
+                    else:
+                        st.markdown(f"- {label}")
 
     with tab_inst:
         st.markdown(f":{verdict_color}[**{llm.verdict}**]　信心：**{llm.confidence}**")
