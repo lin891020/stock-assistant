@@ -5,6 +5,10 @@
 輸入股票代號，系統從 TWSE OpenAPI 抓取最近 60 筆交易日資料，
 計算五項技術指標並產生量化評分（0–100），再由 Claude AI 生成結構化說明。
 
+**功能：**
+- **單股分析**：技術指標評分 + RAG 新聞增強（Google News RSS）+ Claude AI 說明（散戶／法人兩種模式）
+- **多股比較**：最多 4 支股票同時比較，股價標準化為相對漲跌幅（%），附技術指標評分比較表
+
 ## 系統架構
 
 ```
@@ -93,7 +97,7 @@ uvicorn app.main:app --reload
 
 **Streamlit（互動介面）**
 ```bash
-streamlit run streamlit_app.py
+streamlit run 台股分析.py
 # 開啟 http://localhost:8501
 ```
 
@@ -148,5 +152,5 @@ pytest tests/
 
 - TWSE OpenAPI 僅涵蓋上市股票，不含上櫃（OTC）
 - 資料在盤後才更新，盤中無法取得當日資料
-- 技術指標僅反映價格行為，不含基本面或新聞資訊
+- 技術指標僅反映價格行為，不含基本面；新聞透過 Google News RSS 抓取，可能不穩定
 - LLM 說明為輔助參考，**非投資建議**

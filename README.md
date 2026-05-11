@@ -4,6 +4,10 @@
 
 A Taiwan stock market attention analysis tool. Input a stock ticker and the system fetches the latest 60 trading days of data from TWSE, calculates five technical indicators, produces a quantitative score (0–100), and generates a structured explanation via Claude AI.
 
+**Features:**
+- **Single-stock analysis** — technical indicator scoring + RAG news augmentation (Google News RSS) + Claude AI explanation (retail / institutional modes)
+- **Multi-stock comparison** — up to 4 stocks overlaid on a normalized % return chart, with side-by-side indicator score table
+
 ## Architecture
 
 ```
@@ -147,5 +151,5 @@ pytest tests/
 
 - TWSE OpenAPI covers listed stocks only (not OTC/emerging market boards)
 - Data updates after market close; intraday data is not available
-- Technical indicators reflect price behavior only — no fundamentals or news
+- Technical indicators reflect price behavior only — no fundamentals; news is fetched via Google News RSS (best-effort, gracefully degraded)
 - LLM output is for reference only, not investment advice
