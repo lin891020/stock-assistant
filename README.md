@@ -92,7 +92,7 @@ uvicorn app.main:app --reload
 
 **Streamlit (UI)**
 ```bash
-streamlit run streamlit_app.py
+streamlit run 台股分析.py
 # Opens http://localhost:8501
 ```
 

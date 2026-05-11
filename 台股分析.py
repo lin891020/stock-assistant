@@ -204,7 +204,29 @@ def _render_score_bars(scores, total_score: int) -> None:
 # Main app
 # ---------------------------------------------------------------------------
 
+def _setup_sidebar() -> None:
+    st.markdown("""
+    <style>
+    [data-testid="stSidebarNav"]::before {
+        content: "📈 台股助理";
+        display: block;
+        margin: 1.2rem 0.75rem 0.4rem;
+        font-size: 1.15rem;
+        font-weight: 700;
+        letter-spacing: 0.02em;
+    }
+    [data-testid="stSidebarNav"] a {
+        border-radius: 0.5rem;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    with st.sidebar:
+        st.caption("資料來源：TWSE｜AI 說明僅供參考，非投資建議")
+
+
 def main() -> None:
+    _setup_sidebar()
+    _load_stock_list()  # 頁面載入時預先暖 cache，避免首次打字時卡頓
     st.title("📈 台股關注度分析")
     st.caption("輸入股票代號，系統將從 TWSE 抓取近 60 筆交易日資料，計算技術指標後由 AI 生成分析說明。")
 

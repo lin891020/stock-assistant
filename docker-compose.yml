@@ -11,4 +11,4 @@ services:
     ports:
       - "8501:8501"
     env_file: .env
-    command: streamlit run streamlit_app.py --server.address 0.0.0.0 --server.port 8501
+    command: streamlit run 台股分析.py --server.address 0.0.0.0 --server.port 8501
