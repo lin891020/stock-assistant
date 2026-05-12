@@ -101,6 +101,10 @@ class LLMOutput(BaseModel):
     summary: str = Field(
         description="約 150–200 字的中文說明"
     )
+    next_actions: list[str] = Field(
+        default_factory=list,
+        description="建議後續觀察重點，1–3 點具體可執行的觀察項目"
+    )
 
 
 # ---------------------------------------------------------------------------

@@ -305,8 +305,12 @@ def main() -> None:
     with tab_retail:
         st.markdown(f":{verdict_color}[**{llm.verdict}**]　信心：**{llm.confidence}**")
         st.markdown(llm.summary)
+        st.divider()
         st.markdown("**⚠️ 風險提示**")
         st.markdown("\n".join(f"- {r}" for r in llm.risks))
+        if llm.next_actions:
+            st.markdown("**📋 建議後續觀察**")
+            st.markdown("\n".join(f"- {a}" for a in llm.next_actions))
         if news_items:
             with st.expander("📰 參考新聞來源"):
                 for news in news_items:
@@ -329,6 +333,9 @@ def main() -> None:
         st.markdown("\n".join(f"- {s}" for s in llm.key_signals))
         st.markdown("**⚠️ 風險提示**")
         st.markdown("\n".join(f"- {r}" for r in llm.risks))
+        if llm.next_actions:
+            st.markdown("**📋 建議後續觀察**")
+            st.markdown("\n".join(f"- {a}" for a in llm.next_actions))
 
 
 
