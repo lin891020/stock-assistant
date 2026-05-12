@@ -2,46 +2,89 @@
 
 # Stock Assistant
 
-A Taiwan stock market attention analysis tool. Input a stock ticker and the system fetches the latest 60 trading days of data from TWSE, calculates five technical indicators, produces a quantitative score (0–100), and generates a structured explanation via Claude AI.
+A quantitative screening tool for Taiwan listed stocks. The system fetches 60 trading days of TWSE data, scores five technical indicators (0–100), augments with recent news headlines via Google News RSS, then generates a structured AI explanation via Claude.
 
-**Features:**
-- **Single-stock analysis** — technical indicator scoring + RAG news augmentation (Google News RSS) + Claude AI explanation (retail / institutional modes)
-- **Multi-stock comparison** — up to 4 stocks overlaid on a normalized % return chart, with side-by-side indicator score table
+## Demo
 
-## Architecture
+<!-- Replace with actual demo video / GIF after recording -->
+> 🎬 *Demo video — coming soon*
+
+## Features
+
+| Feature | Description |
+|---------|-------------|
+| Single-stock analysis | Technical scoring + RAG news augmentation + Claude AI explanation in retail / institutional modes |
+| Multi-stock comparison | Up to 4 stocks, normalized % return overlay chart + side-by-side indicator score table |
+
+## Architecture & Design
 
 ```
-User Input (stock ticker)
-        │
-        ▼
-┌───────────────────┐
-│  FastAPI / Streamlit  │  ← two independent entry points
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  twse_client.py   │  ← fetch 3 months from TWSE OpenAPI (async, retry)
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  analyzer.py      │  ← calculate indicators + score (pure Python/pandas)
-└───────────────────┘
-        │
-        ▼
-┌───────────────────┐
-│  llm.py           │  ← Claude generates structured JSON + summary
-└───────────────────┘
-        │
-        ▼
-  JSON response / Streamlit UI
+User Input
+    │
+    ▼
+┌──────────────────────────────┐
+│  Streamlit UI                │  ← imports app/ directly (no FastAPI HTTP hop)
+└──────────────────────────────┘
+    │
+    ├── twse_client.py    ← async TWSE fetch, exponential backoff retry
+    ├── analyzer.py       ← deterministic scoring (pure Python / pandas)
+    ├── news_fetcher.py   ← Google News RSS, gracefully degraded
+    └── llm.py            ← Claude: explain only, never decide
 ```
 
-**Key design decision:** Streamlit imports `app/` modules directly — it does not go through FastAPI over HTTP. This avoids unnecessary network overhead.
+**Key design decisions:**
+- Streamlit calls `app/` modules directly — no FastAPI middleman, no extra network hop for a single-user demo
+- All scoring is deterministic Python; LLM only translates numbers into language
+- LLM verdict is decorative — `analyzer.py` always makes the authoritative call
+- RAG news augmentation is non-blocking: if the RSS fetch fails, LLM analysis continues with technical indicators only
+
+## LLM Strategy
+
+Claude receives a structured summary (scores + news headlines), not raw price data, and returns a typed JSON object:
+
+```json
+{
+  "verdict": "值得關注",
+  "confidence": "高",
+  "key_signals": ["成交量放大 1.8 倍", "短期均線上穿長期均線"],
+  "risks": ["RSI 偏高，注意追高風險"],
+  "summary": "..."
+}
+```
+
+**Prompt design:**
+- System prompt is fixed and cache-controlled (Anthropic Prompt Caching — reused within 5-minute TTL to reduce token cost)
+- LLM is explicitly instructed to use only the provided indicators and news headlines — no external knowledge
+- Streaming output via `messages.stream()` for responsive UI
+- Two views rendered from the same JSON: **retail mode** (narrative summary) and **institutional mode** (raw scores + signals)
+- If JSON parsing fails, raw streamed text is shown as fallback; quantitative scores are unaffected
+
+**RAG flow:**
+```
+Google News RSS (stock code + name)
+    → fetch_recent_news()           ← any exception → return []
+    → headlines appended to prompt
+    → LLM cites headlines in summary
+    → UI shows source expander for user verification
+```
+
+## TWSE API Integration
+
+`STOCK_DAY` endpoint — 3 calls per stock (one per month, ~60 trading days total).
+
+**Three distinct error types:**
+
+| Error | Cause | Handling |
+|-------|-------|----------|
+| `StockNotFoundError` | Ticker absent from TWSE listed stocks | User-facing error, early return |
+| `InsufficientDataError` | Fewer than 20 trading days returned | User-facing warning, early return |
+| `TWSEUnavailableError` | API unreachable after 3 retries (exponential backoff) | User-facing error, early return |
+
+**Rate limiting:** Multi-stock comparison fetches sequentially with 0.5 s delay between tickers, plus `st.cache_data(ttl=600)` to avoid redundant requests. (Concurrent fetching with `asyncio.gather` triggered HiNetCDN WAF — HTTP 307 with no `Location` header — diagnosed via `curl`; fixed by switching to sequential fetch.)
 
 ## Scoring Logic
 
-A quantitative scoring system (0–100). Score ≥ 60 → "Worth Watching".
+Score ≥ 60 → "Worth Watching". All thresholds are manually calibrated domain knowledge; not backtested.
 
 | Indicator | Weight | Type | Logic |
 |-----------|--------|------|-------|
@@ -51,91 +94,28 @@ A quantitative scoring system (0–100). Score ≥ 60 → "Worth Watching".
 | RSI (14-day) | 20 | Coincident | RSI 45–65 → 20 pts; 35–45 or 65–75 → 10 pts |
 | Stability | 10 | Risk | Price CV < 0.05 → 10 pts |
 
-Leading indicators (MA + Volume) carry higher weight because the goal is early detection, not confirmation of events already in the past.
-
-## LLM Role
-
-Claude receives structured indicator data and returns a JSON object — it does **not** make the verdict decision. All decisions are made deterministically by `analyzer.py`.
-
-```json
-{
-  "verdict": "Worth Watching",
-  "confidence": "Medium",
-  "key_signals": ["Volume surged 1.8x", "Short MA crossed above long MA"],
-  "risks": ["RSI elevated, chasing risk"],
-  "summary": "..."
-}
-```
-
-Prompt caching is enabled on the system prompt to reduce token costs on repeated queries.
+Leading indicators (MA + Volume) carry higher weight because the goal is early detection, not confirmation of events already past.
 
 ## Setup
 
-**Prerequisites:** Python 3.9+, an Anthropic API key.
+**Prerequisites:** Python 3.9+, Anthropic API key
 
 ```bash
-# 1. Clone and enter the project
 cd stock-assistant
-
-# 2. Install dependencies
 pip install -r requirements.txt
-
-# 3. Configure environment
-cp .env.example .env
-# Edit .env and set ANTHROPIC_API_KEY=your_key_here
+cp .env.example .env   # set ANTHROPIC_API_KEY
 ```
 
-## Running
-
-**FastAPI (REST API)**
+**Run locally**
 ```bash
-uvicorn app.main:app --reload
-# API docs: http://localhost:8000/docs
-# Example: GET http://localhost:8000/analyze/2330
+streamlit run 台股分析.py      # UI → http://localhost:8501
+uvicorn app.main:app --reload  # REST API → http://localhost:8000/docs
 ```
 
-**Streamlit (UI)**
+**Run with Docker**
 ```bash
-streamlit run 台股分析.py
-# Opens http://localhost:8501
+docker compose up
 ```
-
-## API Response
-
-```json
-{
-  "stock_no": "2330",
-  "period": { "start": "2025-03-10", "end": "2025-05-09" },
-  "score": 75,
-  "verdict": "值得關注",
-  "indicators": {
-    "ma_crossover_score": 25,
-    "volume_surge_ratio": 1.62,
-    "volume_surge_score": 25,
-    "price_trend_pct": 0.0821,
-    "price_trend_score": 20,
-    "rsi": 58.3,
-    "rsi_score": 20,
-    "stability_cv": 0.042,
-    "stability_score": 10
-  },
-  "llm_output": {
-    "verdict": "值得關注",
-    "confidence": "高",
-    "key_signals": ["..."],
-    "risks": ["..."],
-    "summary": "..."
-  }
-}
-```
-
-## Error Handling
-
-| Scenario | HTTP Status | Message |
-|----------|-------------|---------|
-| Ticker not found | 404 | No data found for stock |
-| Insufficient data | 422 | Fewer than 20 trading days available |
-| TWSE API unavailable | 503 | API unavailable after 3 retries (exponential backoff) |
 
 ## Testing
 
@@ -143,13 +123,19 @@ streamlit run 台股分析.py
 pytest tests/
 ```
 
-- `test_analyzer.py` — full unit tests for each indicator and scoring logic
-- `test_twse_client.py` — mock tests for data parsing (comma stripping, ROC date conversion)
-- `llm.py` is not tested (non-deterministic output)
+29 unit tests across two modules:
+- `test_analyzer.py` — indicator calculation and scoring edge cases
+- `test_twse_client.py` — data parsing mocks (comma stripping, ROC-to-AD date conversion)
 
-## Limitations
+`llm.py` is intentionally untested — non-deterministic output.
 
-- TWSE OpenAPI covers listed stocks only (not OTC/emerging market boards)
-- Data updates after market close; intraday data is not available
-- Technical indicators reflect price behavior only — no fundamentals; news is fetched via Google News RSS (best-effort, gracefully degraded)
-- LLM output is for reference only, not investment advice
+## Assumptions, Limitations & Risks
+
+| Item | Detail |
+|------|--------|
+| Data scope | TWSE listed stocks only — no OTC, ETFs, or warrants |
+| Data freshness | End-of-day only; current trading day unavailable until ~14:00 after market close |
+| News reliability | Google News RSS is best-effort; failures silently degrade to no-news mode |
+| LLM accuracy | Hallucination risk exists; mitigated by structured prompt scope and user-visible news source links |
+| TWSE stability | HiNetCDN WAF may temporarily block IPs under high request frequency |
+| Scoring thresholds | Manually calibrated — not validated against historical returns |
