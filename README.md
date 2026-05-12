@@ -16,23 +16,16 @@ A quantitative screening tool for Taiwan listed stocks. The system fetches 60 tr
 | Single-stock analysis | Technical scoring + RAG news augmentation + Claude AI explanation in retail / institutional modes |
 | Multi-stock comparison | Up to 4 stocks, normalized % return overlay chart + side-by-side indicator score table |
 
-## Architecture & Design
+## Architecture
 
-The system has two independent entry points: a **Streamlit UI** (the primary interface) and a **FastAPI REST API** (for programmatic access). Both import the `app/` core modules directly — Streamlit does not go through FastAPI over HTTP, avoiding an unnecessary network hop.
+![Architecture](docs/architecture.png)
 
-The core pipeline runs in three stages:
+## Design Decisions
 
-1. **Fetch** — `twse_client.py` calls the TWSE `STOCK_DAY` endpoint asynchronously (3 calls per stock, one per month). Failed calls are retried up to 3 times with exponential backoff. Concurrently, `news_fetcher.py` queries Google News RSS for recent headlines. News failures are silently caught and return an empty list — they never block the main flow.
-
-2. **Score** — `analyzer.py` calculates five technical indicators and produces a deterministic 0–100 score. This layer has no dependency on the LLM; it always runs first and its output is always authoritative.
-
-3. **Explain** — `llm.py` receives a structured summary (scores + news headlines) and returns a typed JSON object via Claude. The LLM's role is strictly explanatory: it translates numbers into language. It does not make the verdict decision — `analyzer.py` does.
-
-**Key design decisions:**
-- Streamlit imports `app/` directly — no FastAPI middleman, lower latency for a single-user demo
-- Scoring is fully deterministic; even if the LLM fails entirely, charts and scores remain functional
-- LLM output is scoped to the provided data — the system prompt explicitly prohibits adding external knowledge
-- RAG news augmentation is non-blocking: if RSS fetch fails, LLM analysis continues with technical indicators only
+- **Direct Import** — Streamlit imports `app/` modules directly, no FastAPI middleman. Avoids an unnecessary network hop for a single-user demo; both entry points share the same core without coupling to each other.
+- **Deterministic Scoring** — All indicator calculation and verdict logic lives in `analyzer.py` (pure Python/pandas). The LLM never touches the score. If Claude fails entirely, charts and scores remain fully functional.
+- **LLM is Explanatory Only** — Claude receives a structured summary (scores + news headlines), not raw price data. The system prompt explicitly prohibits adding external knowledge, scoping hallucination risk to the explanation layer only.
+- **Non-Blocking RAG** — News augmentation via Google News RSS is a best-effort path. Any failure is silently caught and returns an empty list — it never blocks the scoring or LLM explanation pipeline.
 
 ## LLM Strategy
 

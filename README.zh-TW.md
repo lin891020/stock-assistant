@@ -16,23 +16,16 @@
 | 單股分析 | 技術指標評分 + RAG 新聞增強 + Claude AI 說明（散戶 / 法人兩種模式） |
 | 多股比較 | 最多 4 支股票，標準化相對漲跌幅（%）疊圖 + 技術指標評分比較表 |
 
-## 系統架構與設計思路
+## 系統架構
 
-系統有兩個獨立入口：**Streamlit UI**（主要操作介面）和 **FastAPI REST API**（程式化存取）。兩者都直接 import `app/` 核心模組，Streamlit 不透過 FastAPI 走 HTTP，省去不必要的網路開銷。
+![Architecture](docs/architecture.png)
 
-核心流程分三個階段：
+## 設計決策
 
-1. **抓取** — `twse_client.py` 非同步呼叫 TWSE `STOCK_DAY` endpoint（每支股票 3 次，各取一個月資料）。失敗時以指數退避最多 retry 3 次。同時，`news_fetcher.py` 向 Google News RSS 查詢近期新聞標題。新聞抓取失敗會靜默 catch 並回傳空 list，不阻斷主流程。
-
-2. **評分** — `analyzer.py` 計算五項技術指標，產生 0–100 的確定性評分。這一層完全不依賴 LLM，永遠先執行，結果永遠是最終依據。
-
-3. **解釋** — `llm.py` 將結構化摘要（評分 + 新聞標題）送給 Claude，取回定型 JSON 說明。LLM 的角色嚴格限定為「解釋」：把數字翻譯成語言，不做決策，不能加入 prompt 以外的資訊。
-
-**關鍵設計決策：**
-- Streamlit 直接 import `app/` — 省去 FastAPI 一層 HTTP，降低 demo 延遲
-- 評分完全確定性；就算 LLM 完全失敗，圖表和分數仍正常顯示
-- LLM 輸出被框限在給定資料範圍內 — system prompt 明確禁止引用外部資訊
-- RAG 新聞抓取為非阻塞路徑：RSS 失敗時，LLM 分析照常執行，只是少了新聞脈絡
+- **直接 Import** — Streamlit 直接 import `app/` 模組，不走 FastAPI HTTP。省去不必要的網路開銷；兩個 entry point 共用同一份核心，互不耦合。
+- **確定性評分** — 所有指標計算與結論邏輯都在 `analyzer.py`（純 Python/pandas）。LLM 不碰評分。就算 Claude 完全失敗，圖表和分數仍正常顯示。
+- **LLM 只負責解釋** — Claude 收到的是結構化摘要（評分 + 新聞標題），不是原始股價資料。System prompt 明確禁止引用外部資訊，把幻覺風險框限在說明文字層。
+- **非阻塞 RAG** — Google News RSS 新聞抓取為 best-effort 路徑。任何失敗都靜默 catch 並回傳空 list，不阻斷評分或 LLM 說明的主流程。
 
 ## LLM 使用方式與 Prompt 策略
 
