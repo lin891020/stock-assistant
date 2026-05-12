@@ -18,25 +18,21 @@ A quantitative screening tool for Taiwan listed stocks. The system fetches 60 tr
 
 ## Architecture & Design
 
-```
-User Input
-    │
-    ▼
-┌──────────────────────────────┐
-│  Streamlit UI                │  ← imports app/ directly (no FastAPI HTTP hop)
-└──────────────────────────────┘
-    │
-    ├── twse_client.py    ← async TWSE fetch, exponential backoff retry
-    ├── analyzer.py       ← deterministic scoring (pure Python / pandas)
-    ├── news_fetcher.py   ← Google News RSS, gracefully degraded
-    └── llm.py            ← Claude: explain only, never decide
-```
+The system has two independent entry points: a **Streamlit UI** (the primary interface) and a **FastAPI REST API** (for programmatic access). Both import the `app/` core modules directly — Streamlit does not go through FastAPI over HTTP, avoiding an unnecessary network hop.
+
+The core pipeline runs in three stages:
+
+1. **Fetch** — `twse_client.py` calls the TWSE `STOCK_DAY` endpoint asynchronously (3 calls per stock, one per month). Failed calls are retried up to 3 times with exponential backoff. Concurrently, `news_fetcher.py` queries Google News RSS for recent headlines. News failures are silently caught and return an empty list — they never block the main flow.
+
+2. **Score** — `analyzer.py` calculates five technical indicators and produces a deterministic 0–100 score. This layer has no dependency on the LLM; it always runs first and its output is always authoritative.
+
+3. **Explain** — `llm.py` receives a structured summary (scores + news headlines) and returns a typed JSON object via Claude. The LLM's role is strictly explanatory: it translates numbers into language. It does not make the verdict decision — `analyzer.py` does.
 
 **Key design decisions:**
-- Streamlit calls `app/` modules directly — no FastAPI middleman, no extra network hop for a single-user demo
-- All scoring is deterministic Python; LLM only translates numbers into language
-- LLM verdict is decorative — `analyzer.py` always makes the authoritative call
-- RAG news augmentation is non-blocking: if the RSS fetch fails, LLM analysis continues with technical indicators only
+- Streamlit imports `app/` directly — no FastAPI middleman, lower latency for a single-user demo
+- Scoring is fully deterministic; even if the LLM fails entirely, charts and scores remain functional
+- LLM output is scoped to the provided data — the system prompt explicitly prohibits adding external knowledge
+- RAG news augmentation is non-blocking: if RSS fetch fails, LLM analysis continues with technical indicators only
 
 ## LLM Strategy
 

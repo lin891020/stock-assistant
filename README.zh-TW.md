@@ -18,24 +18,20 @@
 
 ## 系統架構與設計思路
 
-```
-使用者輸入
-    │
-    ▼
-┌──────────────────────────────┐
-│  Streamlit UI                │  ← 直接 import app/，不透過 FastAPI HTTP
-└──────────────────────────────┘
-    │
-    ├── twse_client.py    ← 非同步抓取 TWSE，指數退避 retry
-    ├── analyzer.py       ← 確定性評分（純 Python / pandas）
-    ├── news_fetcher.py   ← Google News RSS，失敗靜默降級
-    └── llm.py            ← Claude：只解釋，不決策
-```
+系統有兩個獨立入口：**Streamlit UI**（主要操作介面）和 **FastAPI REST API**（程式化存取）。兩者都直接 import `app/` 核心模組，Streamlit 不透過 FastAPI 走 HTTP，省去不必要的網路開銷。
+
+核心流程分三個階段：
+
+1. **抓取** — `twse_client.py` 非同步呼叫 TWSE `STOCK_DAY` endpoint（每支股票 3 次，各取一個月資料）。失敗時以指數退避最多 retry 3 次。同時，`news_fetcher.py` 向 Google News RSS 查詢近期新聞標題。新聞抓取失敗會靜默 catch 並回傳空 list，不阻斷主流程。
+
+2. **評分** — `analyzer.py` 計算五項技術指標，產生 0–100 的確定性評分。這一層完全不依賴 LLM，永遠先執行，結果永遠是最終依據。
+
+3. **解釋** — `llm.py` 將結構化摘要（評分 + 新聞標題）送給 Claude，取回定型 JSON 說明。LLM 的角色嚴格限定為「解釋」：把數字翻譯成語言，不做決策，不能加入 prompt 以外的資訊。
 
 **關鍵設計決策：**
-- Streamlit 直接 import `app/` 模組 — 省去 FastAPI 一層 HTTP，降低 demo 延遲
-- 所有評分邏輯由 Python 確定性計算；LLM 只負責把數字翻譯成語言
-- LLM 的結論是展示用 — `analyzer.py` 的評分永遠是最終依據
+- Streamlit 直接 import `app/` — 省去 FastAPI 一層 HTTP，降低 demo 延遲
+- 評分完全確定性；就算 LLM 完全失敗，圖表和分數仍正常顯示
+- LLM 輸出被框限在給定資料範圍內 — system prompt 明確禁止引用外部資訊
 - RAG 新聞抓取為非阻塞路徑：RSS 失敗時，LLM 分析照常執行，只是少了新聞脈絡
 
 ## LLM 使用方式與 Prompt 策略
