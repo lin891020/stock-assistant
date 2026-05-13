@@ -404,6 +404,77 @@ async def _agentic_loop_github(user_prompt: str) -> tuple[str, list[dict]]:
     return last_text, tool_trace
 
 
+async def _agentic_loop_anthropic(user_prompt: str) -> tuple[str, list[dict]]:
+    """Anthropic Claude agentic loop using tool_use.
+
+    Returns:
+        (final_text, tool_trace)
+        tool_trace entries: {"query": str, "count": int, "elapsed_s": float}
+    """
+    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    messages: list[dict] = [{"role": "user", "content": user_prompt}]
+    tool_trace: list[dict] = []
+    seen_queries: set[str] = set()
+    loop_start = time.time()
+    last_text = ""
+
+    for _ in range(MAX_TOOL_ROUNDS):
+        response = client.messages.create(
+            model=ANTHROPIC_MODEL,
+            max_tokens=1024,
+            system=[
+                {
+                    "type": "text",
+                    "text": _SYSTEM_PROMPT,
+                    "cache_control": {"type": "ephemeral"},
+                }
+            ],
+            messages=messages,
+            tools=[_SEARCH_NEWS_TOOL_ANTHROPIC],
+        )
+
+        if response.stop_reason != "tool_use":
+            last_text = next(
+                (b.text for b in response.content if b.type == "text"), ""
+            )
+            return last_text, tool_trace
+
+        # Append assistant turn
+        messages.append({"role": "assistant", "content": response.content})
+
+        # Execute tool calls, collect results for one user turn
+        tool_results = []
+        for block in response.content:
+            if block.type != "tool_use":
+                continue
+
+            query: str = block.input["query"]
+            max_items: int = min(block.input.get("max_items", 5), 8)
+
+            if query not in seen_queries:
+                seen_queries.add(query)
+                elapsed = time.time() - loop_start
+                news_items = await search_news_by_query(query, max_items)
+                tool_trace.append({
+                    "query": query,
+                    "count": len(news_items),
+                    "elapsed_s": round(elapsed, 1),
+                })
+                result_content = json.dumps(news_items, ensure_ascii=False)
+            else:
+                result_content = "[]"
+
+            tool_results.append({
+                "type": "tool_result",
+                "tool_use_id": block.id,
+                "content": result_content,
+            })
+
+        messages.append({"role": "user", "content": tool_results})
+
+    return last_text, tool_trace
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
