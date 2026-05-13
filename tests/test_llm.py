@@ -10,8 +10,8 @@ os.environ.setdefault("LLM_PROVIDER", "github")
 os.environ.setdefault("GITHUB_TOKEN", "fake-token")
 os.environ.setdefault("ANTHROPIC_API_KEY", "fake-key")
 
-from app.llm import _agentic_loop_anthropic, _agentic_loop_github
-from app.models import AnalysisResult, IndicatorScores
+from app.llm import _agentic_loop_anthropic, _agentic_loop_github, run_agentic_analysis
+from app.models import AnalysisResult, IndicatorScores, LLMOutput
 
 
 def _fake_result() -> AnalysisResult:
@@ -223,3 +223,52 @@ class TestAgenticLoopAnthropic:
             final_text, _ = await _agentic_loop_anthropic("test prompt")
 
         assert final_text == ""
+
+
+@pytest.mark.asyncio
+class TestRunAgenticAnalysis:
+    async def test_routes_to_github_when_provider_github(self):
+        """LLM_PROVIDER=github 時應呼叫 _agentic_loop_github。"""
+        fake_trace = [{"query": "台積電", "count": 2, "elapsed_s": 1.0}]
+
+        with (
+            patch.dict(os.environ, {"LLM_PROVIDER": "github"}),
+            patch("app.llm._agentic_loop_github", new_callable=AsyncMock,
+                  return_value=(_VALID_JSON, fake_trace)) as mock_gh,
+            patch("app.llm._agentic_loop_anthropic", new_callable=AsyncMock) as mock_an,
+        ):
+            llm_output, trace = await run_agentic_analysis(_fake_result())
+
+        mock_gh.assert_called_once()
+        mock_an.assert_not_called()
+        assert isinstance(llm_output, LLMOutput)
+        assert llm_output.verdict == "值得關注"
+        assert trace == fake_trace
+
+    async def test_routes_to_anthropic_when_provider_anthropic(self):
+        """LLM_PROVIDER=anthropic 時應呼叫 _agentic_loop_anthropic。"""
+        fake_trace: list[dict] = []
+
+        with (
+            patch.dict(os.environ, {"LLM_PROVIDER": "anthropic"}),
+            patch("app.llm._agentic_loop_github", new_callable=AsyncMock) as mock_gh,
+            patch("app.llm._agentic_loop_anthropic", new_callable=AsyncMock,
+                  return_value=(_VALID_JSON, fake_trace)) as mock_an,
+        ):
+            llm_output, trace = await run_agentic_analysis(_fake_result())
+
+        mock_an.assert_called_once()
+        mock_gh.assert_not_called()
+        assert isinstance(llm_output, LLMOutput)
+
+    async def test_fallback_on_empty_final_text(self):
+        """LLM 回傳空字串（max rounds 耗盡）時，應回傳 fallback LLMOutput。"""
+        with (
+            patch.dict(os.environ, {"LLM_PROVIDER": "github"}),
+            patch("app.llm._agentic_loop_github", new_callable=AsyncMock,
+                  return_value=("", [])),
+        ):
+            llm_output, _ = await run_agentic_analysis(_fake_result())
+
+        assert isinstance(llm_output, LLMOutput)
+        assert llm_output.confidence == "低"  # fallback always sets confidence to 低

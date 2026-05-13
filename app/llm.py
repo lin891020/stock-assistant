@@ -521,3 +521,28 @@ def stream_analysis(result: AnalysisResult, news_items: list[dict] | None = None
         yield from _stream_anthropic(user_prompt)
     else:
         yield from _stream_github(user_prompt)
+
+
+async def run_agentic_analysis(
+    result: AnalysisResult,
+) -> tuple[LLMOutput, list[dict]]:
+    """Agentic analysis: LLM calls search_news tool, returns structured output + trace.
+
+    Args:
+        result: analyzer.analyze() output (technical indicator data)
+
+    Returns:
+        (LLMOutput, tool_trace)
+        tool_trace: list of {"query": str, "count": int, "elapsed_s": float}
+    """
+    provider = _get_provider()
+    user_prompt = _build_agentic_user_prompt(result)
+
+    logger.info("Running agentic analysis via provider: %s", provider)
+
+    if provider == "github":
+        final_text, tool_trace = await _agentic_loop_github(user_prompt)
+    else:
+        final_text, tool_trace = await _agentic_loop_anthropic(user_prompt)
+
+    return _parse_llm_output(final_text, result), tool_trace
