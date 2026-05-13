@@ -48,6 +48,30 @@ async def fetch_recent_news(
     return _parse_rss(resp.text, max_items)
 
 
+async def search_news_by_query(query: str, max_items: int = 5) -> list[dict]:
+    """從 Google News RSS 搜尋新聞，接受自由關鍵字字串。
+
+    供 LLM agentic loop 使用；query 由 LLM 自行決定，不再固定格式。
+    任何錯誤靜默回傳空 list，不影響主流程。
+
+    Args:
+        query: 搜尋關鍵字，例如 "台積電 CoWoS 法說會"
+        max_items: 最多回傳幾則
+
+    Returns:
+        list of {"title": str, "source": str, "published": str, "url": str}
+    """
+    url = _RSS_URL.format(query=urllib.parse.quote(query))
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+    except Exception as exc:
+        logger.warning("Failed to fetch news for query '%s': %s", query, exc)
+        return []
+    return _parse_rss(resp.text, max_items)
+
+
 def _parse_rss(xml_text: str, max_items: int) -> list[dict]:
     """解析 Google News RSS XML，回傳新聞列表。"""
     try:
