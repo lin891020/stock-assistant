@@ -2,7 +2,7 @@
 
 # Stock Assistant
 
-A quantitative screening tool for Taiwan listed stocks. The system fetches 60 trading days of TWSE data, scores five technical indicators (0–100), augments with recent news headlines via Google News RSS, then generates a structured AI explanation via Claude.
+A quantitative screening tool for Taiwan listed stocks. The system fetches 60 trading days of TWSE data, scores five technical indicators (0–100), then runs an **agentic news search** — the LLM actively decides what to search and calls a `search_news` tool to fetch relevant headlines from Google News RSS before generating a structured analysis.
 
 ## Demo
 
@@ -13,23 +13,32 @@ A quantitative screening tool for Taiwan listed stocks. The system fetches 60 tr
 
 | Feature | Description |
 |---------|-------------|
-| Single-stock analysis | Technical scoring + RAG news augmentation + Claude AI explanation in retail / institutional modes |
+| Single-stock analysis | Technical scoring + agentic news search + AI explanation in retail / institutional modes |
 | Multi-stock comparison | Up to 4 stocks, normalized % return overlay chart + side-by-side indicator score table |
+| AI search transparency | Expandable panel showing each LLM thinking step and news search with per-step timing |
+| Dual LLM provider | Supports Anthropic (Claude) and GitHub Models (gpt-4o-mini) via `LLM_PROVIDER` env var |
 
 ## Architecture
 
-![Architecture](docs/architecture.png)
+![Architecture](docs/architecture.svg)
+
+**Architecture Highlights:**
+- Two entry points — Streamlit dashboard for interactive use and FastAPI for programmatic access — both import `app/` directly with no HTTP layer between them.
+- Stock price data is fetched from TWSE OpenAPI; news context is retrieved on a best-effort basis from Google News RSS via an agentic tool-use loop.
+- The scoring logic (`analyzer.py`) is fully deterministic and does not depend on the LLM — charts and scores remain functional even if the LLM call fails.
+- The LLM is used only for explanation, summarization, and risk interpretation; it calls `search_news` as a tool to decide what news to fetch rather than receiving pre-formatted headlines.
+- The final output is typed JSON rendered into two UI modes: retail (narrative) and institutional (raw scores + signals).
 
 ## Design Decisions
 
 - **Direct Import** — Streamlit imports `app/` modules directly, no FastAPI middleman. Avoids an unnecessary network hop for a single-user demo; both entry points share the same core without coupling to each other.
-- **Deterministic Scoring** — All indicator calculation and verdict logic lives in `analyzer.py` (pure Python/pandas). The LLM never touches the score. If Claude fails entirely, charts and scores remain fully functional.
-- **LLM is Explanatory Only** — Claude receives a structured summary (scores + news headlines), not raw price data. The system prompt explicitly prohibits adding external knowledge, scoping hallucination risk to the explanation layer only.
-- **Non-Blocking RAG** — News augmentation via Google News RSS is a best-effort path. Any failure is silently caught and returns an empty list — it never blocks the scoring or LLM explanation pipeline.
+- **Deterministic Scoring** — All indicator calculation and verdict logic lives in `analyzer.py` (pure Python/pandas). The LLM never touches the score. If the LLM fails entirely, charts and scores remain fully functional.
+- **LLM is Explanatory Only** — The LLM receives a structured summary (scores + searched news), not raw price data. The system prompt explicitly prohibits adding external knowledge, scoping hallucination risk to the explanation layer only.
+- **Agentic News Search** — Instead of pre-fetching fixed headlines and passing them to the LLM, the LLM decides what to search. It calls `search_news` as a tool (max 3 rounds), picks its own queries, and incorporates results into the analysis. This mirrors how an analyst would look up context on demand.
 
 ## LLM Strategy
 
-Claude receives a structured summary (scores + news headlines), not raw price data, and returns a typed JSON object:
+Claude (or gpt-4o-mini) runs an agentic tool-use loop and returns a typed JSON object:
 
 ```json
 {
@@ -37,25 +46,35 @@ Claude receives a structured summary (scores + news headlines), not raw price da
   "confidence": "高",
   "key_signals": ["成交量放大 1.8 倍", "短期均線上穿長期均線"],
   "risks": ["RSI 偏高，注意追高風險"],
-  "summary": "..."
+  "summary": "...",
+  "next_actions": ["觀察成交量是否持續放大"]
 }
 ```
 
-**Prompt design:**
-- System prompt is fixed and cache-controlled (Anthropic Prompt Caching — reused within 5-minute TTL to reduce token cost)
-- LLM is explicitly instructed to use only the provided indicators and news headlines — no external knowledge
-- Streaming output via `messages.stream()` for responsive UI
-- Two views rendered from the same JSON: **retail mode** (narrative summary) and **institutional mode** (raw scores + signals)
-- If JSON parsing fails, raw streamed text is shown as fallback; quantitative scores are unaffected
+**Agentic loop:**
+```
+LLM receives: indicator scores + verdict + date range
+    → LLM decides query ("台積電 法說會")
+    → tool call: search_news_by_query(query)
+    → News Fetcher: Google News RSS
+    → results injected back into conversation
+    → LLM may search again (max 3 rounds)
+    → LLM generates final JSON
+    → _linkify_news_citations(): 《title》→ [title](url)
+```
 
-**RAG flow:**
-```
-Google News RSS (stock code + name)
-    → fetch_recent_news()           ← any exception → return []
-    → headlines appended to prompt
-    → LLM cites headlines in summary
-    → UI shows source expander for user verification
-```
+**Provider support:**
+- `LLM_PROVIDER=anthropic` — Claude via `anthropic` SDK, native `tool_use` / `end_turn` protocol
+- `LLM_PROVIDER=github` — gpt-4o-mini via OpenAI-compatible SDK, `function_calling` / `finish_reason` protocol
+
+**UI transparency:**
+- Expandable "AI search process" panel shows every step with timing
+- 💭 LLM thinking steps (e.g., "AI 思考中 4.0s")
+- 🔍 Search steps (e.g., "搜尋：台積電 法說會 → 5 則 0.9s")
+- All step durations sum to the displayed total elapsed time
+
+**Fallback behavior:**
+- If the agentic loop exhausts max rounds or JSON parsing fails, a low-confidence fallback `LLMOutput` is returned — charts and scores are unaffected
 
 ## TWSE API Integration
 
@@ -87,12 +106,23 @@ Leading indicators (MA + Volume) carry higher weight because the goal is early d
 
 ## Setup
 
-**Prerequisites:** Python 3.9+, Anthropic API key
+**Prerequisites:** Python 3.9+, one of: Anthropic API key or GitHub Models token
 
 ```bash
 cd stock-assistant
 pip install -r requirements.txt
-cp .env.example .env   # set ANTHROPIC_API_KEY
+cp .env.example .env
+```
+
+**.env options:**
+```bash
+# Option A: Anthropic (Claude)
+LLM_PROVIDER=anthropic
+ANTHROPIC_API_KEY=sk-ant-...
+
+# Option B: GitHub Models (gpt-4o-mini, free tier available)
+LLM_PROVIDER=github
+GITHUB_TOKEN=ghp_...
 ```
 
 **Run locally**
@@ -112,11 +142,10 @@ docker compose up
 pytest tests/
 ```
 
-29 unit tests across two modules:
+46 unit tests across three modules:
 - `test_analyzer.py` — indicator calculation and scoring edge cases
 - `test_twse_client.py` — data parsing mocks (comma stripping, ROC-to-AD date conversion)
-
-`llm.py` is intentionally untested — non-deterministic output.
+- `test_llm.py` — agentic loop logic (tool call routing, duplicate query deduplication, max-rounds fallback, provider switching)
 
 ## Assumptions, Limitations & Risks
 
@@ -125,6 +154,6 @@ pytest tests/
 | Data scope | TWSE listed stocks only — no OTC, ETFs, or warrants |
 | Data freshness | End-of-day only; current trading day unavailable until ~14:00 after market close |
 | News reliability | Google News RSS is best-effort; failures silently degrade to no-news mode |
-| LLM accuracy | Hallucination risk exists; mitigated by structured prompt scope and user-visible news source links |
+| LLM accuracy | Hallucination risk exists; mitigated by structured prompt scope and user-visible clickable news source links |
 | TWSE stability | HiNetCDN WAF may temporarily block IPs under high request frequency |
 | Scoring thresholds | Manually calibrated — not validated against historical returns |

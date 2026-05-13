@@ -1,0 +1,173 @@
+<svg width="900" height="460" viewBox="0 0 900 460" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0d1b3e"/>
+      <stop offset="50%" stop-color="#1a1054"/>
+      <stop offset="100%" stop-color="#0f172a"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+      <feDropShadow dx="0" dy="3" stdDeviation="6" flood-color="rgba(0,0,0,0.45)"/>
+    </filter>
+    <marker id="arr" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="rgba(255,255,255,0.55)"/>
+    </marker>
+    <marker id="arr-cyan" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="rgba(56,189,248,0.85)"/>
+    </marker>
+    <marker id="arr-amber" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="rgba(251,191,36,0.9)"/>
+    </marker>
+    <marker id="arr-violet" markerWidth="8" markerHeight="6" refX="7" refY="3" orient="auto">
+      <polygon points="0 0, 8 3, 0 6" fill="rgba(167,139,250,0.8)"/>
+    </marker>
+  </defs>
+
+  <!-- Background -->
+  <rect width="900" height="460" fill="url(#bg)" rx="14"/>
+  <circle cx="780" cy="80" r="120" fill="rgba(99,102,241,0.07)"/>
+  <circle cx="120" cy="380" r="100" fill="rgba(14,165,233,0.06)"/>
+
+  <!-- Title -->
+  <text x="450" y="26" font-family="-apple-system,BlinkMacSystemFont,Segoe UI,sans-serif" font-size="13" font-weight="700" fill="rgba(255,255,255,0.82)" text-anchor="middle" letter-spacing="3">STOCK ASSISTANT — ARCHITECTURE</text>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- ROW 1: ENTRY POINTS                        -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <!-- User -->
+  <circle cx="48" cy="90" r="23" fill="rgba(255,255,255,0.08)" stroke="rgba(255,255,255,0.22)" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="48" y="85" font-size="15" text-anchor="middle" font-family="sans-serif">👤</text>
+  <text x="48" y="103" font-family="-apple-system,sans-serif" font-size="9" fill="rgba(255,255,255,0.5)" text-anchor="middle">User</text>
+
+  <!-- Streamlit UI -->
+  <rect x="84" y="50" width="212" height="80" rx="11" fill="rgba(99,102,241,0.22)" stroke="rgba(139,92,246,0.6)" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="190" y="75" font-family="-apple-system,sans-serif" font-size="13.5" font-weight="700" fill="rgba(255,255,255,0.97)" text-anchor="middle">Streamlit UI</text>
+  <text x="190" y="93" font-family="-apple-system,sans-serif" font-size="10" fill="rgba(200,185,255,0.82)" text-anchor="middle">Interactive dashboard</text>
+  <text x="190" y="111" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.42)" text-anchor="middle">Charts · Scores · AI explanation</text>
+
+  <!-- FastAPI -->
+  <rect x="692" y="50" width="176" height="80" rx="11" fill="rgba(15,118,110,0.22)" stroke="rgba(20,184,166,0.5)" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="780" y="75" font-family="-apple-system,sans-serif" font-size="13.5" font-weight="700" fill="rgba(255,255,255,0.97)" text-anchor="middle">FastAPI</text>
+  <text x="780" y="93" font-family="-apple-system,sans-serif" font-size="10" fill="rgba(94,234,212,0.85)" text-anchor="middle">GET /analyze/{stock_no}</text>
+  <text x="780" y="111" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.42)" text-anchor="middle">JSON API endpoint</text>
+
+  <!-- User → Streamlit -->
+  <line x1="71" y1="90" x2="82" y2="90" stroke="rgba(255,255,255,0.5)" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- FastAPI → app/core: right-angle down-left -->
+  <path d="M 780 130 L 780 160 L 638 160 L 638 166" stroke="rgba(45,212,191,0.28)" stroke-width="1.2" fill="none" stroke-dasharray="6,4" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- app/ core boundary                          -->
+  <!-- ══════════════════════════════════════════ -->
+  <rect x="34" y="140" width="832" height="278" rx="12" fill="rgba(255,255,255,0.022)" stroke="rgba(255,255,255,0.09)" stroke-width="1" stroke-dasharray="8,5"/>
+  <text x="52" y="157" font-family="-apple-system,sans-serif" font-size="8.5" font-weight="600" fill="rgba(255,255,255,0.28)" letter-spacing="1.5">APP/ CORE</text>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- ROW 2: CORE PIPELINE                        -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <!-- TWSE Client -->
+  <rect x="50" y="168" width="186" height="86" rx="11" fill="rgba(14,165,233,0.22)" stroke="rgba(56,189,248,0.55)" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="143" y="194" font-family="-apple-system,sans-serif" font-size="13.5" font-weight="700" fill="rgba(255,255,255,0.97)" text-anchor="middle">TWSE Client</text>
+  <text x="143" y="212" font-family="-apple-system,sans-serif" font-size="10" fill="rgba(125,211,252,0.85)" text-anchor="middle">Fetches price data</text>
+  <text x="143" y="230" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.4)" text-anchor="middle">Retry · Timeout</text>
+
+  <!-- Analyzer -->
+  <rect x="284" y="168" width="200" height="86" rx="11" fill="rgba(16,185,129,0.22)" stroke="rgba(52,211,153,0.55)" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="384" y="194" font-family="-apple-system,sans-serif" font-size="13.5" font-weight="700" fill="rgba(255,255,255,0.97)" text-anchor="middle">Analyzer</text>
+  <text x="384" y="212" font-family="-apple-system,sans-serif" font-size="10" fill="rgba(110,231,183,0.88)" text-anchor="middle">5 indicators → 0–100 score</text>
+  <text x="384" y="230" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(52,211,153,0.72)" text-anchor="middle">Deterministic, no LLM</text>
+
+  <!-- LLM Module -->
+  <rect x="532" y="168" width="212" height="86" rx="11" fill="rgba(168,85,247,0.22)" stroke="rgba(192,132,252,0.55)" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="638" y="194" font-family="-apple-system,sans-serif" font-size="13.5" font-weight="700" fill="rgba(255,255,255,0.97)" text-anchor="middle">LLM Module</text>
+  <text x="638" y="212" font-family="-apple-system,sans-serif" font-size="10" fill="rgba(216,180,254,0.85)" text-anchor="middle">Generates explanation</text>
+  <text x="638" y="230" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(192,132,252,0.68)" text-anchor="middle">Score remains deterministic</text>
+
+  <!-- Pipeline: right-angle arrows -->
+  <!-- Streamlit → TWSE Client: down then left then down -->
+  <path d="M 190 130 L 190 158 L 143 158 L 143 166" stroke="rgba(255,255,255,0.42)" stroke-width="1.5" fill="none" marker-end="url(#arr)"/>
+  <!-- TWSE Client → Analyzer: straight right -->
+  <line x1="236" y1="211" x2="282" y2="211" stroke="rgba(255,255,255,0.42)" stroke-width="1.5" marker-end="url(#arr)"/>
+  <!-- Analyzer → LLM: straight right -->
+  <line x1="484" y1="211" x2="530" y2="211" stroke="rgba(255,255,255,0.42)" stroke-width="1.5" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- ROW 3: OUTPUTS + EXTERNAL                   -->
+  <!-- ══════════════════════════════════════════ -->
+
+  <!-- TWSE OpenAPI (external) -->
+  <rect x="50" y="294" width="186" height="72" rx="10" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.18)" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="143" y="317" font-family="-apple-system,sans-serif" font-size="12" font-weight="600" fill="rgba(255,255,255,0.68)" text-anchor="middle">TWSE OpenAPI</text>
+  <text x="143" y="335" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.4)" text-anchor="middle">opendata.twse.com.tw</text>
+  <text x="143" y="352" font-family="-apple-system,sans-serif" font-size="9" fill="rgba(255,255,255,0.3)" text-anchor="middle">End-of-day · External</text>
+
+  <!-- Structured JSON -->
+  <rect x="268" y="294" width="210" height="72" rx="11" fill="rgba(168,85,247,0.16)" stroke="rgba(192,132,252,0.38)" stroke-width="1.5"/>
+  <text x="373" y="317" font-family="-apple-system,sans-serif" font-size="12" font-weight="700" fill="rgba(216,180,254,0.92)" text-anchor="middle">Structured JSON</text>
+  <text x="373" y="335" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.52)" text-anchor="middle">Verdict · Risks · Summary</text>
+  <text x="373" y="352" font-family="-apple-system,sans-serif" font-size="9" fill="rgba(192,132,252,0.58)" text-anchor="middle">Citations · Next actions</text>
+
+  <!-- Agentic loop boundary -->
+  <rect x="494" y="284" width="220" height="102" rx="10" fill="rgba(251,191,36,0.05)" stroke="rgba(251,191,36,0.28)" stroke-width="1" stroke-dasharray="5,3"/>
+  <!-- Label: small corner text matching APP/CORE style, left side clear of arrows -->
+  <text x="502" y="299" font-family="-apple-system,sans-serif" font-size="8.5" font-weight="600" fill="rgba(251,191,36,0.6)" letter-spacing="1">AGENTIC LOOP</text>
+
+  <!-- News Fetcher -->
+  <rect x="502" y="302" width="200" height="74" rx="11" fill="rgba(251,146,60,0.22)" stroke="rgba(251,191,36,0.55)" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="602" y="326" font-family="-apple-system,sans-serif" font-size="13.5" font-weight="700" fill="rgba(255,255,255,0.97)" text-anchor="middle">News Fetcher</text>
+  <text x="602" y="344" font-family="-apple-system,sans-serif" font-size="10" fill="rgba(253,224,71,0.82)" text-anchor="middle">Google News RSS</text>
+  <text x="602" y="362" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.4)" text-anchor="middle">Optional news context</text>
+
+  <!-- LLM Provider (external) -->
+  <rect x="728" y="294" width="140" height="72" rx="10" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.18)" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="798" y="317" font-family="-apple-system,sans-serif" font-size="12" font-weight="600" fill="rgba(255,255,255,0.68)" text-anchor="middle">LLM Provider</text>
+  <text x="798" y="335" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.4)" text-anchor="middle">Anthropic · GitHub</text>
+  <text x="798" y="352" font-family="-apple-system,sans-serif" font-size="9" fill="rgba(255,255,255,0.3)" text-anchor="middle">Models · External</text>
+
+  <!-- ══ Row 2 → Row 3 arrows: ALL ORTHOGONAL ══ -->
+
+  <!-- TWSE Client → TWSE OpenAPI: straight down -->
+  <line x1="143" y1="254" x2="143" y2="292" stroke="rgba(56,189,248,0.6)" stroke-width="1.5" marker-end="url(#arr-cyan)"/>
+
+  <!-- LLM → Structured JSON: down then left then down (L-shape) -->
+  <!-- From LLM left-bottom → gap row → JSON top -->
+  <path d="M 551 254 L 551 272 L 373 272 L 373 292" stroke="rgba(192,132,252,0.55)" stroke-width="1.5" fill="none" marker-end="url(#arr-violet)"/>
+
+  <!-- LLM → News Fetcher: straight down (tool call, forward) -->
+  <!-- x=614: right of "AGENTIC LOOP" text, left of return arrow -->
+  <line x1="614" y1="254" x2="614" y2="300" stroke="rgba(251,191,36,0.85)" stroke-width="1.5" marker-end="url(#arr-amber)"/>
+
+  <!-- News Fetcher → LLM: straight up, offset right (return, dashed) -->
+  <line x1="658" y1="300" x2="658" y2="254" stroke="rgba(251,191,36,0.45)" stroke-width="1.2" stroke-dasharray="5,3" marker-end="url(#arr-amber)"/>
+
+  <!-- LLM → LLM Provider: right then down -->
+  <path d="M 744 220 L 798 220 L 798 292" stroke="rgba(192,132,252,0.3)" stroke-width="1.2" fill="none" stroke-dasharray="5,3" marker-end="url(#arr-violet)"/>
+
+  <!-- Structured JSON → Streamlit: left then up (dashed return) -->
+  <path d="M 268 330 L 190 330 L 190 130" stroke="rgba(99,102,241,0.38)" stroke-width="1.2" fill="none" stroke-dasharray="5,3" marker-end="url(#arr)"/>
+
+  <!-- ══════════════════════════════════════════ -->
+  <!-- LEGEND                                      -->
+  <!-- ══════════════════════════════════════════ -->
+  <rect x="34" y="410" width="832" height="38" rx="8" fill="rgba(255,255,255,0.035)" stroke="rgba(255,255,255,0.07)" stroke-width="1"/>
+
+  <rect x="54" y="422" width="10" height="10" rx="2" fill="rgba(99,102,241,0.45)" stroke="rgba(139,92,246,0.7)" stroke-width="1"/>
+  <text x="70" y="432" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.52)">Entry Point</text>
+
+  <rect x="162" y="422" width="10" height="10" rx="2" fill="rgba(14,165,233,0.35)" stroke="rgba(56,189,248,0.65)" stroke-width="1"/>
+  <text x="178" y="432" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.52)">Data Fetch</text>
+
+  <rect x="268" y="422" width="10" height="10" rx="2" fill="rgba(16,185,129,0.35)" stroke="rgba(52,211,153,0.65)" stroke-width="1"/>
+  <text x="284" y="432" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.52)">Deterministic Scoring</text>
+
+  <rect x="440" y="422" width="10" height="10" rx="2" fill="rgba(168,85,247,0.35)" stroke="rgba(192,132,252,0.65)" stroke-width="1"/>
+  <text x="456" y="432" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.52)">LLM (explanatory only)</text>
+
+  <rect x="626" y="422" width="10" height="10" rx="2" fill="rgba(251,146,60,0.35)" stroke="rgba(251,191,36,0.65)" stroke-width="1"/>
+  <text x="642" y="432" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.52)">Agentic Tool</text>
+
+  <line x1="738" y1="427" x2="764" y2="427" stroke="rgba(255,255,255,0.18)" stroke-width="1" stroke-dasharray="5,3"/>
+  <text x="769" y="432" font-family="-apple-system,sans-serif" font-size="9.5" fill="rgba(255,255,255,0.4)">External</text>
+</svg>

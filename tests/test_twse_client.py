@@ -5,15 +5,17 @@ Mock tests for app/twse_client.py.
   1. 千分位逗號是否被正確 strip
   2. 民國年日期是否被正確轉換為西元年
   3. 缺值列（停牌日）是否被正確丟棄
+  4. fetch_stock_list 能正確解析 TWSE ISIN HTML（mock HTTP）
 
-網路請求的部分（retry、503 錯誤）依賴 TWSE 服務本身，
-mock 的複雜度高但覆蓋的邏輯簡單，故不列入測試範圍。
+網路 retry / 503 錯誤依賴 TWSE 服務本身，不列入測試範圍。
 """
+
+from unittest.mock import AsyncMock, MagicMock, patch
 
 import pandas as pd
 import pytest
 
-from app.twse_client import _parse_monthly_data, _roc_to_ad_date
+from app.twse_client import _parse_monthly_data, _roc_to_ad_date, fetch_stock_list
 
 
 # ---------------------------------------------------------------------------
@@ -74,3 +76,66 @@ class TestParseMonthlyData:
         df = _parse_monthly_data([])
         assert isinstance(df, pd.DataFrame)
         assert len(df) == 0
+
+
+# ---------------------------------------------------------------------------
+# fetch_stock_list
+# ---------------------------------------------------------------------------
+
+# 模擬 TWSE ISIN 頁面的 HTML 片段（big5 encode → bytes）
+_FAKE_ISIN_HTML = """
+<html><body><table>
+<tr><th>有價證券代號及名稱</th></tr>
+<tr><td>股票</td></tr>
+<tr><td>2330　台積電</td><td>TW0002330008</td></tr>
+<tr><td>2317　鴻海</td><td>TW0002317005</td></tr>
+<tr><td>ABC　非數字代號</td><td>INVALID</td></tr>
+<tr><td></td></tr>
+</table></body></html>
+""".encode("big5", errors="ignore")
+
+
+def _make_mock_client(content: bytes):
+    """建立一個模擬 httpx.AsyncClient，get() 回傳指定內容。"""
+    mock_resp = MagicMock()
+    mock_resp.content = content
+
+    mock_client = AsyncMock()
+    mock_client.__aenter__ = AsyncMock(return_value=mock_client)
+    mock_client.__aexit__ = AsyncMock(return_value=False)
+    mock_client.get = AsyncMock(return_value=mock_resp)
+    return mock_client
+
+
+@pytest.mark.asyncio
+class TestFetchStockList:
+    async def test_returns_only_numeric_codes(self):
+        """只回傳代號為純數字的股票，非數字代號應被過濾掉。"""
+        with patch("app.twse_client.httpx.AsyncClient", return_value=_make_mock_client(_FAKE_ISIN_HTML)):
+            result = await fetch_stock_list()
+        codes = [code for code, _ in result]
+        assert "2330" in codes
+        assert "2317" in codes
+        assert "ABC" not in codes
+
+    async def test_returns_correct_names(self):
+        """股票名稱應正確解析（全形空白分隔後的第二欄）。"""
+        with patch("app.twse_client.httpx.AsyncClient", return_value=_make_mock_client(_FAKE_ISIN_HTML)):
+            result = await fetch_stock_list()
+        result_dict = dict(result)
+        assert result_dict["2330"] == "台積電"
+        assert result_dict["2317"] == "鴻海"
+
+    async def test_returns_list_of_tuples(self):
+        """回傳型別應為 list of (str, str) tuples。"""
+        with patch("app.twse_client.httpx.AsyncClient", return_value=_make_mock_client(_FAKE_ISIN_HTML)):
+            result = await fetch_stock_list()
+        assert isinstance(result, list)
+        assert all(isinstance(item, tuple) and len(item) == 2 for item in result)
+
+    async def test_empty_html_returns_empty_list(self):
+        """HTML 無有效資料列時，應回傳空 list 而非拋例外。"""
+        empty_html = "<html><body><table><tr><th>header</th></tr></table></body></html>".encode("big5")
+        with patch("app.twse_client.httpx.AsyncClient", return_value=_make_mock_client(empty_html)):
+            result = await fetch_stock_list()
+        assert result == []

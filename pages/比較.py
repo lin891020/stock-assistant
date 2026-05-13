@@ -44,7 +44,7 @@ st.set_page_config(
 
 @st.cache_data(ttl=86400)
 def _load_stock_list() -> list[tuple[str, str]]:
-    return fetch_stock_list()
+    return asyncio.run(fetch_stock_list())
 
 
 def _search_stocks(query: str) -> list[str]:

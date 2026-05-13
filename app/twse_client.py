@@ -266,14 +266,15 @@ async def fetch_stock_data(stock_no: str) -> pd.DataFrame:
     return df
 
 
-def fetch_stock_list() -> list[tuple[str, str]]:
+async def fetch_stock_list() -> list[tuple[str, str]]:
     """從 TWSE ISIN 頁面抓取所有上市股票清單。
 
     Returns:
         [(stock_code, stock_name), ...] 只含純數字代號的股票。
     """
     url = "https://isin.twse.com.tw/isin/C_public.jsp?strMode=2"
-    resp = httpx.get(url, timeout=10.0)
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        resp = await client.get(url)
     html = resp.content.decode("big5", errors="ignore")
 
     rows = re.findall(r"<tr[^>]*>(.*?)</tr>", html, re.DOTALL)
