@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import time
 from collections.abc import Generator
 
 import anthropic
@@ -25,6 +26,7 @@ from dotenv import load_dotenv
 from openai import OpenAI
 
 from app.models import AnalysisResult, LLMOutput
+from app.news_fetcher import search_news_by_query
 
 load_dotenv()
 
@@ -39,6 +41,50 @@ ANTHROPIC_MODEL = "claude-haiku-4-5-20251001"
 # GitHub Models 使用 Azure OpenAI-compatible endpoint
 GITHUB_MODEL = "gpt-4o-mini"
 GITHUB_BASE_URL = "https://models.inference.ai.azure.com"
+
+MAX_TOOL_ROUNDS = 3  # agentic loop upper bound
+
+_SEARCH_NEWS_TOOL_OPENAI = {
+    "type": "function",
+    "function": {
+        "name": "search_news",
+        "description": "搜尋台股相關新聞標題，用於輔助技術分析。可呼叫多次使用不同關鍵字。",
+        "parameters": {
+            "type": "object",
+            "properties": {
+                "query": {
+                    "type": "string",
+                    "description": "搜尋關鍵字，例如：「台積電 CoWoS 法說會」",
+                },
+                "max_items": {
+                    "type": "integer",
+                    "description": "最多回傳幾則新聞，預設 5，最大 8",
+                    "default": 5,
+                },
+            },
+            "required": ["query"],
+        },
+    },
+}
+
+_SEARCH_NEWS_TOOL_ANTHROPIC = {
+    "name": "search_news",
+    "description": "搜尋台股相關新聞標題，用於輔助技術分析。可呼叫多次使用不同關鍵字。",
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "query": {
+                "type": "string",
+                "description": "搜尋關鍵字，例如：「台積電 CoWoS 法說會」",
+            },
+            "max_items": {
+                "type": "integer",
+                "description": "最多回傳幾則新聞，預設 5，最大 8",
+            },
+        },
+        "required": ["query"],
+    },
+}
 
 
 def _get_provider() -> str:
@@ -141,6 +187,20 @@ def _build_user_prompt(result: AnalysisResult, news_items: list[dict] | None = N
 
     lines += ["", "請依照系統 prompt 指定的 JSON 格式輸出分析結果。"]
     return "\n".join(lines)
+
+
+def _build_agentic_user_prompt(result: AnalysisResult) -> str:
+    """User prompt for agentic loop — same base as _build_user_prompt but instructs tool use.
+
+    Does not pre-include news; the model fetches news via search_news tool calls.
+    """
+    base = _build_user_prompt(result, news_items=None)
+    return (
+        base
+        + "\n\n【工具使用說明】\n"
+        "你有 search_news 工具可以主動搜尋新聞。"
+        "請先搜尋 1–2 次與此股票近期相關的新聞，再生成分析結果。"
+    )
 
 
 # ---------------------------------------------------------------------------
