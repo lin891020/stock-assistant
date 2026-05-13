@@ -220,7 +220,8 @@ def _parse_llm_output(raw_text: str, result: AnalysisResult) -> LLMOutput:
         LLMOutput，無論解析成功或失敗都保證回傳有效物件。
     """
     try:
-        data = json.loads(raw_text.strip())
+        text = re.sub(r"^```(?:json)?\s*|\s*```$", "", raw_text.strip(), flags=re.DOTALL)
+        data = json.loads(text)
         return LLMOutput(**data)
     except (json.JSONDecodeError, ValueError) as exc:
         logger.warning("Failed to parse LLM JSON output, using fallback: %s", exc)
@@ -304,7 +305,7 @@ def _generate_github(user_prompt: str) -> str:
             {"role": "user", "content": user_prompt},
         ],
     )
-    return response.choices[0].message.content
+    return response.choices[0].message.content or ""
 
 
 def _stream_github(user_prompt: str) -> Generator[str, None, None]:
@@ -386,6 +387,8 @@ async def _agentic_loop_github(user_prompt: str) -> tuple[str, list[dict]]:
         choice = response.choices[0]
 
         if choice.finish_reason != "tool_calls":
+            if choice.finish_reason not in ("stop", "tool_calls"):
+                logger.warning("Unexpected finish_reason from GitHub Models: %s", choice.finish_reason)
             last_text = choice.message.content or ""
             tool_trace.append({"type": "llm", "label": "AI 生成分析", "duration_s": llm_duration})
             return last_text, tool_trace

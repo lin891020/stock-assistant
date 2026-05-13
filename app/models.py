@@ -99,7 +99,7 @@ class LLMOutput(BaseModel):
         description="主要風險提示，1–3 點"
     )
     summary: str = Field(
-        description="約 150–200 字的中文說明"
+        description="約 400–500 字的中文說明"
     )
     next_actions: list[str] = Field(
         default_factory=list,
