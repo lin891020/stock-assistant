@@ -18,6 +18,18 @@ _RSS_URL = "https://news.google.com/rss/search?q={query}&hl=zh-TW&gl=TW&ceid=TW:
 _TIMEOUT = 5.0
 
 
+async def _fetch_rss(url: str, label: str, max_items: int) -> list[dict]:
+    """Fetch and parse a Google News RSS URL. Returns [] on any error."""
+    try:
+        async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
+            resp = await client.get(url)
+            resp.raise_for_status()
+    except Exception as exc:
+        logger.warning("Failed to fetch news for %s: %s", label, exc)
+        return []
+    return _parse_rss(resp.text, max_items)
+
+
 async def fetch_recent_news(
     stock_no: str,
     stock_name: str = "",
@@ -35,17 +47,8 @@ async def fetch_recent_news(
         抓取失敗時回傳空 list。
     """
     query = f"{stock_no} {stock_name} 股票".strip()
-    url = _RSS_URL.format(query=urllib.parse.quote(query))
-
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-    except Exception as exc:
-        logger.warning("Failed to fetch news for %s: %s", stock_no, exc)
-        return []
-
-    return _parse_rss(resp.text, max_items)
+    url = _RSS_URL.format(query=urllib.parse.quote(query, safe=""))
+    return await _fetch_rss(url, stock_no, max_items)
 
 
 async def search_news_by_query(query: str, max_items: int = 5) -> list[dict]:
@@ -61,15 +64,8 @@ async def search_news_by_query(query: str, max_items: int = 5) -> list[dict]:
     Returns:
         list of {"title": str, "source": str, "published": str, "url": str}
     """
-    url = _RSS_URL.format(query=urllib.parse.quote(query))
-    try:
-        async with httpx.AsyncClient(timeout=_TIMEOUT, follow_redirects=True) as client:
-            resp = await client.get(url)
-            resp.raise_for_status()
-    except Exception as exc:
-        logger.warning("Failed to fetch news for query '%s': %s", query, exc)
-        return []
-    return _parse_rss(resp.text, max_items)
+    url = _RSS_URL.format(query=urllib.parse.quote(query, safe=""))
+    return await _fetch_rss(url, query, max_items)
 
 
 def _parse_rss(xml_text: str, max_items: int) -> list[dict]:
