@@ -13,8 +13,8 @@ Streamlit frontend for Stock Assistant.
 """
 
 import asyncio
-import json
 import os
+import time
 
 import plotly.graph_objects as go
 import streamlit as st
@@ -22,9 +22,7 @@ from dotenv import load_dotenv
 from streamlit_searchbox import st_searchbox
 
 from app import analyzer
-from app.llm import stream_analysis
-from app.models import LLMOutput
-from app.news_fetcher import fetch_recent_news
+from app.llm import run_agentic_analysis
 from app.twse_client import (
     InsufficientDataError,
     StockNotFoundError,
@@ -52,7 +50,7 @@ _MODEL_LABEL = "GitHub Models (gpt-4o-mini)" if _provider == "github" else "Clau
 
 @st.cache_data(ttl=86400)
 def _load_stock_list() -> list[tuple[str, str]]:
-    return fetch_stock_list()
+    return asyncio.run(fetch_stock_list())
 
 
 def _search_stocks(query: str) -> list[str]:
@@ -82,19 +80,18 @@ def _search_stocks(query: str) -> list[str]:
 # ---------------------------------------------------------------------------
 
 async def _fetch_data_and_name(stock_no: str):
-    """並發抓取股票資料、名稱與新聞，失敗時靜默降級。"""
+    """並發抓取股票資料與名稱。"""
     async def safe_fetch_name(sno: str) -> str:
         try:
             return await fetch_stock_name(sno)
         except Exception:
             return ""
 
-    df, name, news = await asyncio.gather(
+    df, name = await asyncio.gather(
         fetch_stock_data(stock_no),
         safe_fetch_name(stock_no),
-        fetch_recent_news(stock_no),
     )
-    return df, name, news
+    return df, name
 
 
 # ---------------------------------------------------------------------------
@@ -246,7 +243,7 @@ def main() -> None:
     # --- Fetch & analyze ---
     with st.spinner("正在從 TWSE 抓取資料..."):
         try:
-            df, stock_name, news_items = asyncio.run(_fetch_data_and_name(stock_no))
+            df, stock_name = asyncio.run(_fetch_data_and_name(stock_no))
         except StockNotFoundError:
             st.error(f"查無股票代號「{stock_no}」，請確認代號是否正確（目前僅支援上市股票）。")
             return
@@ -285,19 +282,18 @@ def main() -> None:
     st.subheader("AI 分析說明")
     st.caption(f"以下說明由 {_MODEL_LABEL} 根據上方量化指標生成，僅供參考，非投資建議。")
 
-    stream_placeholder = st.empty()
-    chunks: list[str] = []
-    for chunk in stream_analysis(result, news_items or None):
-        chunks.append(chunk)
-        stream_placeholder.markdown("".join(chunks) + "▌")
-    raw_output = "".join(chunks)
-    stream_placeholder.empty()
+    loop_start = time.time()
+    with st.spinner("AI 正在分析中..."):
+        llm, tool_trace = asyncio.run(run_agentic_analysis(result))
+    total_elapsed = time.time() - loop_start
 
-    try:
-        llm = LLMOutput(**json.loads(raw_output))
-    except Exception:
-        st.markdown(raw_output)
-        return
+    if tool_trace:
+        with st.expander(f"🔍 AI 搜尋過程（點擊展開）　⏱ 總耗時 {total_elapsed:.1f} 秒"):
+            for trace in tool_trace:
+                st.caption(
+                    f"[{trace['elapsed_s']:.1f}s] 搜尋：「{trace['query']}」"
+                    f"→ 找到 {trace['count']} 則新聞"
+                )
 
     verdict_color = "green" if llm.verdict == "值得關注" else "red"
     tab_retail, tab_inst = st.tabs(["散戶模式", "法人模式"])
@@ -311,19 +307,6 @@ def main() -> None:
         if llm.next_actions:
             st.markdown("**📋 建議後續觀察**")
             st.markdown("\n".join(f"- {a}" for a in llm.next_actions))
-        if news_items:
-            with st.expander("📰 參考新聞來源"):
-                for news in news_items:
-                    url = news.get("url", "")
-                    title = news["title"]
-                    source = news.get("source", "")
-                    published = news.get("published", "")
-                    label = f"{title}　{source}　{published}"
-                    if url:
-                        st.markdown(f"- [{label}]({url})")
-                    else:
-                        st.markdown(f"- {label}")
-
     with tab_inst:
         st.markdown(f":{verdict_color}[**{llm.verdict}**]　信心：**{llm.confidence}**")
         st.divider()
