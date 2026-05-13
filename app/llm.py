@@ -328,6 +328,82 @@ def _stream_github(user_prompt: str) -> Generator[str, None, None]:
             yield delta
 
 
+async def _agentic_loop_github(user_prompt: str) -> tuple[str, list[dict]]:
+    """GitHub Models agentic loop using OpenAI function calling.
+
+    Returns:
+        (final_text, tool_trace)
+        tool_trace entries: {"query": str, "count": int, "elapsed_s": float}
+    """
+    client = OpenAI(api_key=os.environ["GITHUB_TOKEN"], base_url=GITHUB_BASE_URL)
+    messages: list[dict] = [
+        {"role": "system", "content": _SYSTEM_PROMPT},
+        {"role": "user", "content": user_prompt},
+    ]
+    tool_trace: list[dict] = []
+    seen_queries: set[str] = set()
+    loop_start = time.time()
+    last_text = ""
+
+    for _ in range(MAX_TOOL_ROUNDS):
+        response = client.chat.completions.create(
+            model=GITHUB_MODEL,
+            max_tokens=1024,
+            messages=messages,
+            tools=[_SEARCH_NEWS_TOOL_OPENAI],
+            tool_choice="auto",
+        )
+        choice = response.choices[0]
+
+        if choice.finish_reason != "tool_calls":
+            last_text = choice.message.content or ""
+            return last_text, tool_trace
+
+        # Append assistant turn with tool calls
+        messages.append({
+            "role": "assistant",
+            "content": choice.message.content,
+            "tool_calls": [
+                {
+                    "id": tc.id,
+                    "type": "function",
+                    "function": {
+                        "name": tc.function.name,
+                        "arguments": tc.function.arguments,
+                    },
+                }
+                for tc in choice.message.tool_calls
+            ],
+        })
+
+        # Execute each tool call
+        for tc in choice.message.tool_calls:
+            args = json.loads(tc.function.arguments)
+            query: str = args["query"]
+            max_items: int = min(args.get("max_items", 5), 8)
+
+            if query not in seen_queries:
+                seen_queries.add(query)
+                elapsed = time.time() - loop_start
+                news_items = await search_news_by_query(query, max_items)
+                tool_trace.append({
+                    "query": query,
+                    "count": len(news_items),
+                    "elapsed_s": round(elapsed, 1),
+                })
+                result_content = json.dumps(news_items, ensure_ascii=False)
+            else:
+                result_content = "[]"
+
+            messages.append({
+                "role": "tool",
+                "tool_call_id": tc.id,
+                "content": result_content,
+            })
+
+    return last_text, tool_trace
+
+
 # ---------------------------------------------------------------------------
 # Public API
 # ---------------------------------------------------------------------------
