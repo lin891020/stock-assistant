@@ -143,7 +143,8 @@ _SYSTEM_PROMPT = """你是一位台股技術分析助理。你的工作是根據
 - 說明支撐結論的主要理由
 - 提醒主要風險
 - 約 400–500 字，語氣客觀
-- 如果有提供新聞標題，summary 中必須至少明確引用一則，格式：「根據《新聞標題》...」"""
+- 如果搜尋到新聞，summary 中必須至少明確引用一則
+- 引用格式：[新聞標題](url)，其中 url 取自工具回傳的 url 欄位（若無 url 則用《新聞標題》格式）"""
 
 
 # ---------------------------------------------------------------------------
@@ -384,12 +385,13 @@ async def _agentic_loop_github(user_prompt: str) -> tuple[str, list[dict]]:
 
             if query not in seen_queries:
                 seen_queries.add(query)
-                elapsed = time.time() - loop_start
+                search_start = time.time()
                 news_items = await search_news_by_query(query, max_items)
                 tool_trace.append({
                     "query": query,
                     "count": len(news_items),
-                    "elapsed_s": round(elapsed, 1),
+                    "duration_s": round(time.time() - search_start, 1),
+                    "news": news_items,
                 })
                 result_content = json.dumps(news_items, ensure_ascii=False)
             else:
@@ -453,12 +455,13 @@ async def _agentic_loop_anthropic(user_prompt: str) -> tuple[str, list[dict]]:
 
             if query not in seen_queries:
                 seen_queries.add(query)
-                elapsed = time.time() - loop_start
+                search_start = time.time()
                 news_items = await search_news_by_query(query, max_items)
                 tool_trace.append({
                     "query": query,
                     "count": len(news_items),
-                    "elapsed_s": round(elapsed, 1),
+                    "duration_s": round(time.time() - search_start, 1),
+                    "news": news_items,
                 })
                 result_content = json.dumps(news_items, ensure_ascii=False)
             else:
