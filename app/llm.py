@@ -18,6 +18,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import time
 from collections.abc import Generator
 
@@ -329,12 +330,39 @@ def _stream_github(user_prompt: str) -> Generator[str, None, None]:
             yield delta
 
 
+def _linkify_news_citations(text: str, tool_trace: list[dict]) -> str:
+    """Replace 《title》 citations with [title](url) markdown links.
+
+    Uses URLs from tool_trace news items. Falls back to leaving 《title》 unchanged
+    when the title has no matching URL in the trace.
+    """
+    title_url: dict[str, str] = {}
+    for entry in tool_trace:
+        for news in entry.get("news", []):
+            title = news.get("title", "")
+            url = news.get("url", "")
+            if title and url:
+                title_url[title] = url
+
+    if not title_url:
+        return text
+
+    def _replace(m: re.Match) -> str:
+        title = m.group(1)
+        url = title_url.get(title)
+        return f"[{title}]({url})" if url else m.group(0)
+
+    return re.sub(r"《(.+?)》", _replace, text)
+
+
 async def _agentic_loop_github(user_prompt: str) -> tuple[str, list[dict]]:
     """GitHub Models agentic loop using OpenAI function calling.
 
     Returns:
         (final_text, tool_trace)
-        tool_trace entries: {"query": str, "count": int, "elapsed_s": float}
+        tool_trace entries are chronological, two types:
+          {"type": "llm",    "label": str, "duration_s": float}
+          {"type": "search", "query": str, "count": int, "duration_s": float, "news": list}
     """
     client = OpenAI(api_key=os.environ["GITHUB_TOKEN"], base_url=GITHUB_BASE_URL)
     messages: list[dict] = [
@@ -343,10 +371,10 @@ async def _agentic_loop_github(user_prompt: str) -> tuple[str, list[dict]]:
     ]
     tool_trace: list[dict] = []
     seen_queries: set[str] = set()
-    loop_start = time.time()
     last_text = ""
 
     for _ in range(MAX_TOOL_ROUNDS):
+        llm_start = time.time()
         response = client.chat.completions.create(
             model=GITHUB_MODEL,
             max_tokens=1024,
@@ -354,11 +382,15 @@ async def _agentic_loop_github(user_prompt: str) -> tuple[str, list[dict]]:
             tools=[_SEARCH_NEWS_TOOL_OPENAI],
             tool_choice="auto",
         )
+        llm_duration = round(time.time() - llm_start, 1)
         choice = response.choices[0]
 
         if choice.finish_reason != "tool_calls":
             last_text = choice.message.content or ""
+            tool_trace.append({"type": "llm", "label": "AI 生成分析", "duration_s": llm_duration})
             return last_text, tool_trace
+
+        tool_trace.append({"type": "llm", "label": "AI 思考中", "duration_s": llm_duration})
 
         # Append assistant turn with tool calls
         messages.append({
@@ -388,6 +420,7 @@ async def _agentic_loop_github(user_prompt: str) -> tuple[str, list[dict]]:
                 search_start = time.time()
                 news_items = await search_news_by_query(query, max_items)
                 tool_trace.append({
+                    "type": "search",
                     "query": query,
                     "count": len(news_items),
                     "duration_s": round(time.time() - search_start, 1),
@@ -411,16 +444,18 @@ async def _agentic_loop_anthropic(user_prompt: str) -> tuple[str, list[dict]]:
 
     Returns:
         (final_text, tool_trace)
-        tool_trace entries: {"query": str, "count": int, "elapsed_s": float}
+        tool_trace entries are chronological, two types:
+          {"type": "llm",    "label": str, "duration_s": float}
+          {"type": "search", "query": str, "count": int, "duration_s": float, "news": list}
     """
     client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     messages: list[dict] = [{"role": "user", "content": user_prompt}]
     tool_trace: list[dict] = []
     seen_queries: set[str] = set()
-    loop_start = time.time()
     last_text = ""
 
     for _ in range(MAX_TOOL_ROUNDS):
+        llm_start = time.time()
         response = client.messages.create(
             model=ANTHROPIC_MODEL,
             max_tokens=1024,
@@ -434,12 +469,16 @@ async def _agentic_loop_anthropic(user_prompt: str) -> tuple[str, list[dict]]:
             messages=messages,
             tools=[_SEARCH_NEWS_TOOL_ANTHROPIC],
         )
+        llm_duration = round(time.time() - llm_start, 1)
 
         if response.stop_reason != "tool_use":
             last_text = next(
                 (b.text for b in response.content if b.type == "text"), ""
             )
+            tool_trace.append({"type": "llm", "label": "AI 生成分析", "duration_s": llm_duration})
             return last_text, tool_trace
+
+        tool_trace.append({"type": "llm", "label": "AI 思考中", "duration_s": llm_duration})
 
         # Append assistant turn
         messages.append({"role": "assistant", "content": response.content})
@@ -458,6 +497,7 @@ async def _agentic_loop_anthropic(user_prompt: str) -> tuple[str, list[dict]]:
                 search_start = time.time()
                 news_items = await search_news_by_query(query, max_items)
                 tool_trace.append({
+                    "type": "search",
                     "query": query,
                     "count": len(news_items),
                     "duration_s": round(time.time() - search_start, 1),
@@ -548,4 +588,5 @@ async def run_agentic_analysis(
     else:
         final_text, tool_trace = await _agentic_loop_anthropic(user_prompt)
 
+    final_text = _linkify_news_citations(final_text, tool_trace)
     return _parse_llm_output(final_text, result), tool_trace

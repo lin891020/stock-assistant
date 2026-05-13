@@ -290,20 +290,23 @@ def main() -> None:
     if tool_trace:
         with st.expander(f"🔍 AI 搜尋過程（點擊展開）　⏱ 總耗時 {total_elapsed:.1f} 秒"):
             for trace in tool_trace:
-                st.caption(
-                    f"搜尋：「{trace['query']}」→ 找到 {trace['count']} 則"
-                    f"（耗時 {trace['duration_s']:.1f}s）"
-                )
-                for news in trace.get("news", []):
-                    url = news.get("url", "")
-                    title = news.get("title", "")
-                    source = news.get("source", "")
-                    published = news.get("published", "")
-                    label = f"{title}　{source}　{published}"
-                    if url:
-                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;[{label}]({url})")
-                    else:
-                        st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{label}")
+                if trace.get("type") == "llm":
+                    st.caption(f"💭 {trace['label']}（耗時 {trace['duration_s']:.1f}s）")
+                else:
+                    st.caption(
+                        f"🔍 搜尋：「{trace['query']}」→ 找到 {trace['count']} 則"
+                        f"（耗時 {trace['duration_s']:.1f}s）"
+                    )
+                    for news in trace.get("news", []):
+                        url = news.get("url", "")
+                        title = news.get("title", "")
+                        source = news.get("source", "")
+                        published = news.get("published", "")
+                        label = f"{title}　{source}　{published}"
+                        if url:
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;[{label}]({url})")
+                        else:
+                            st.markdown(f"&nbsp;&nbsp;&nbsp;&nbsp;{label}")
 
     verdict_color = "green" if llm.verdict == "值得關注" else "red"
     tab_retail, tab_inst = st.tabs(["散戶模式", "法人模式"])

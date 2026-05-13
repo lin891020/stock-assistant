@@ -83,7 +83,7 @@ _VALID_JSON = json.dumps({
 @pytest.mark.asyncio
 class TestAgenticLoopGithub:
     async def test_one_tool_call_then_final_answer(self):
-        """Model 呼叫一次 search_news 後回傳最終文字，trace 應有一筆記錄。"""
+        """Model 呼叫一次 search_news 後回傳最終文字，trace 應有一筆 search 記錄。"""
         tool_resp = _make_openai_tool_call_response("台積電 法說會", call_id="call_1")
         final_resp = _make_openai_text_response(_VALID_JSON)
 
@@ -97,10 +97,11 @@ class TestAgenticLoopGithub:
         ):
             final_text, tool_trace = await _agentic_loop_github("test prompt")
 
+        search_entries = [t for t in tool_trace if t.get("type") == "search"]
         assert final_text == _VALID_JSON
-        assert len(tool_trace) == 1
-        assert tool_trace[0]["query"] == "台積電 法說會"
-        assert tool_trace[0]["count"] == 1
+        assert len(search_entries) == 1
+        assert search_entries[0]["query"] == "台積電 法說會"
+        assert search_entries[0]["count"] == 1
 
     async def test_duplicate_query_skipped(self):
         """同一 query 重複呼叫時，search_news_by_query 只執行一次。"""
@@ -119,8 +120,9 @@ class TestAgenticLoopGithub:
         ):
             _, tool_trace = await _agentic_loop_github("test prompt")
 
+        search_entries = [t for t in tool_trace if t.get("type") == "search"]
         assert mock_search.call_count == 1
-        assert len(tool_trace) == 1
+        assert len(search_entries) == 1
 
     async def test_max_rounds_returns_last_text(self):
         """超過 MAX_TOOL_ROUNDS 輪後，回傳最後一次有效文字（即使 tool_calls）。"""
@@ -136,8 +138,9 @@ class TestAgenticLoopGithub:
         ):
             final_text, tool_trace = await _agentic_loop_github("test prompt")
 
+        search_entries = [t for t in tool_trace if t.get("type") == "search"]
         assert final_text == ""
-        assert len(tool_trace) == 1  # only unique query counted
+        assert len(search_entries) == 1  # only unique query counted
 
 
 def _make_anthropic_tool_use_response(query: str, block_id: str = "block_abc"):
@@ -169,7 +172,7 @@ def _make_anthropic_text_response(text: str):
 @pytest.mark.asyncio
 class TestAgenticLoopAnthropic:
     async def test_one_tool_call_then_final_answer(self):
-        """Model 呼叫一次 search_news 後回傳最終文字，trace 應有一筆記錄。"""
+        """Model 呼叫一次 search_news 後回傳最終文字，trace 應有一筆 search 記錄。"""
         tool_resp = _make_anthropic_tool_use_response("台積電 CoWoS", block_id="b1")
         final_resp = _make_anthropic_text_response(_VALID_JSON)
 
@@ -183,10 +186,11 @@ class TestAgenticLoopAnthropic:
         ):
             final_text, tool_trace = await _agentic_loop_anthropic("test prompt")
 
+        search_entries = [t for t in tool_trace if t.get("type") == "search"]
         assert final_text == _VALID_JSON
-        assert len(tool_trace) == 1
-        assert tool_trace[0]["query"] == "台積電 CoWoS"
-        assert tool_trace[0]["count"] == 1
+        assert len(search_entries) == 1
+        assert search_entries[0]["query"] == "台積電 CoWoS"
+        assert search_entries[0]["count"] == 1
 
     async def test_duplicate_query_skipped(self):
         """同一 query 重複呼叫時，search_news_by_query 只執行一次。"""
@@ -205,8 +209,9 @@ class TestAgenticLoopAnthropic:
         ):
             _, tool_trace = await _agentic_loop_anthropic("test prompt")
 
+        search_entries = [t for t in tool_trace if t.get("type") == "search"]
         assert mock_search.call_count == 1
-        assert len(tool_trace) == 1
+        assert len(search_entries) == 1
 
     async def test_max_rounds_returns_empty_string(self):
         """超過 MAX_TOOL_ROUNDS 後回傳空字串（讓呼叫方走 fallback）。"""
