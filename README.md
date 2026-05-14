@@ -7,7 +7,7 @@ A quantitative screening tool for Taiwan listed stocks. The system fetches 60 tr
 ## Demo
 
 <!-- Replace with actual demo video / GIF after recording -->
-> 🎬 *Demo video — coming soon*
+> https://github.com/user-attachments/assets/ad171fa2-13f3-4130-9f67-de9353b8c279
 
 ## Features
 
