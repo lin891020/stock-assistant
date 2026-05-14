@@ -7,7 +7,7 @@
 ## Demo
 
 <!-- 錄製完成後，將 Demo 影片或 GIF 放在這裡 -->
-> 🎬 *Demo 影片 — 即將上線*
+> https://github.com/user-attachments/assets/ad171fa2-13f3-4130-9f67-de9353b8c279
 
 ## 功能
 
