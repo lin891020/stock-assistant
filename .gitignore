@@ -18,6 +18,9 @@ env/
 .vscode/
 .idea/
 
+# Interview prep — not for public
+INTERVIEW_QA.md
+
 # Pytest cache
 .pytest_cache/
 

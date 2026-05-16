@@ -24,7 +24,7 @@ from collections.abc import Generator
 
 import anthropic
 from dotenv import load_dotenv
-from openai import OpenAI
+from openai import AsyncOpenAI, OpenAI
 
 from app.models import AnalysisResult, LLMOutput
 from app.news_fetcher import search_news_by_query
@@ -365,7 +365,7 @@ async def _agentic_loop_github(user_prompt: str) -> tuple[str, list[dict]]:
           {"type": "llm",    "label": str, "duration_s": float}
           {"type": "search", "query": str, "count": int, "duration_s": float, "news": list}
     """
-    client = OpenAI(api_key=os.environ["GITHUB_TOKEN"], base_url=GITHUB_BASE_URL)
+    client = AsyncOpenAI(api_key=os.environ["GITHUB_TOKEN"], base_url=GITHUB_BASE_URL)
     messages: list[dict] = [
         {"role": "system", "content": _SYSTEM_PROMPT},
         {"role": "user", "content": user_prompt},
@@ -376,7 +376,7 @@ async def _agentic_loop_github(user_prompt: str) -> tuple[str, list[dict]]:
 
     for _ in range(MAX_TOOL_ROUNDS):
         llm_start = time.time()
-        response = client.chat.completions.create(
+        response = await client.chat.completions.create(
             model=GITHUB_MODEL,
             max_tokens=1024,
             messages=messages,
@@ -451,7 +451,7 @@ async def _agentic_loop_anthropic(user_prompt: str) -> tuple[str, list[dict]]:
           {"type": "llm",    "label": str, "duration_s": float}
           {"type": "search", "query": str, "count": int, "duration_s": float, "news": list}
     """
-    client = anthropic.Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    client = anthropic.AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
     messages: list[dict] = [{"role": "user", "content": user_prompt}]
     tool_trace: list[dict] = []
     seen_queries: set[str] = set()
@@ -459,7 +459,7 @@ async def _agentic_loop_anthropic(user_prompt: str) -> tuple[str, list[dict]]:
 
     for _ in range(MAX_TOOL_ROUNDS):
         llm_start = time.time()
-        response = client.messages.create(
+        response = await client.messages.create(
             model=ANTHROPIC_MODEL,
             max_tokens=1024,
             system=[
