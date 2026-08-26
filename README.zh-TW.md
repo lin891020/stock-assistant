@@ -127,14 +127,19 @@ GITHUB_TOKEN=ghp_...
 
 **本機啟動**
 ```bash
-streamlit run 台股分析.py      # UI → http://localhost:8501
-uvicorn app.main:app --reload  # REST API → http://localhost:8000/docs
+streamlit run 台股分析.py --server.port 8211   # UI → http://localhost:8211
+uvicorn app.main:app --reload --port 8210      # REST API → http://localhost:8210/docs
 ```
 
 **Docker 啟動**
 ```bash
-docker compose up
+docker compose up -d
 ```
+
+UI → **http://stock.test** · API docs → **http://localhost:8210/docs**
+
+`stock.test` 由本機的 Caddy 代理（設定在 `~/Projects/Caddyfile`），
+`http://localhost:8211` 一樣可以用。
 
 ## 測試
 

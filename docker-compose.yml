@@ -2,13 +2,13 @@ services:
   api:
     build: .
     ports:
-      - "8000:8000"
+      - "8210:8000"
     env_file: .env
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000
 
   streamlit:
     build: .
     ports:
-      - "8501:8501"
+      - "8211:8501"
     env_file: .env
     command: streamlit run 台股分析.py --server.address 0.0.0.0 --server.port 8501

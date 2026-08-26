@@ -127,14 +127,19 @@ GITHUB_TOKEN=ghp_...
 
 **Run locally**
 ```bash
-streamlit run 台股分析.py      # UI → http://localhost:8501
-uvicorn app.main:app --reload  # REST API → http://localhost:8000/docs
+streamlit run 台股分析.py --server.port 8211   # UI → http://localhost:8211
+uvicorn app.main:app --reload --port 8210      # REST API → http://localhost:8210/docs
 ```
 
 **Run with Docker**
 ```bash
-docker compose up
+docker compose up -d
 ```
+
+UI → **http://stock.test** · API docs → **http://localhost:8210/docs**
+
+`stock.test` is served by the local Caddy on port 80 (see `~/Projects/Caddyfile`);
+`http://localhost:8211` keeps working too.
 
 ## Testing
 
